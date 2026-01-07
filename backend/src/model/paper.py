@@ -15,6 +15,7 @@ class Paper(BaseModel):
     title: str
     abstract: str
     authors: List[str] = Field(default_factory=list)
+    keywords: List[str] = Field(default_factory=list)
 
     # links: List[HttpUrl] = Field(default_factory=list)
     # pdf_url: Optional[HttpUrl] = None

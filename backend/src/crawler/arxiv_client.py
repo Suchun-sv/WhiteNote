@@ -1,8 +1,8 @@
 import arxiv
 from ..model.paper import Paper
-from ..config import settings
+from ..config import Config
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from datetime import datetime
 
 class ArxivClient:
@@ -13,7 +13,7 @@ class ArxivClient:
             num_retries=3,
         )
 
-    def search_papers(self, keywords: List[str], date_range: Tuple[datetime, datetime]) -> List[Paper]:
+    def search_papers(self, keywords: List[str], date_range: Tuple[datetime, datetime]) -> Dict[str, List[Paper]]:
         """
         Result(
         entry_id: str,
@@ -31,22 +31,35 @@ class ArxivClient:
         _raw: feedparser.util.FeedParserDict | None = None
     )
         """
-        search_query = arxiv.Search(
-            query=keywords,
-            max_results=100,
-            sort_by=arxiv.SortCriterion.Relevance,
-            sort_order=arxiv.SortOrder.Descending,
-        )
-        results = self.arxiv_client.results(search_query)
-        return [self._arxiv_result_to_paper(result) for result in results]
+        keywords_papers: Dict[str, List[Paper]] = {}
+        for keyword in keywords:
+            keywords_papers[keyword] = []
+            search_query = arxiv.Search(
+                query=keyword,
+                max_results=100,
+                sort_by=arxiv.SortCriterion.Relevance,   
+                sort_order=arxiv.SortOrder.Descending,
+            )
+            results = self.arxiv_client.results(search_query)
+            keywords_papers[keyword].extend([self._arxiv_result_to_paper(result, keyword) for result in results])
+        return keywords_papers
     
-    def _arxiv_result_to_paper(self, result: arxiv.Result) -> Paper:
+    def _normalize_arxiv_id(self, arxiv_id: str) -> str:
+        import re
+        last = arxiv_id.split("/")[-1]
+
+        return re.sub(r"v\d+", "", last)
+    
+    def _arxiv_result_to_paper(self, result: arxiv.Result, keyword: str) -> Paper:
         return Paper(
+            id=self._normalize_arxiv_id(result.entry_id),
             title=result.title,
             abstract=result.summary,
             authors=[author.name for author in result.authors],
             links=[link.href for link in result.links],
-
+            keywords=[keyword],
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
             arxiv_entry_id=result.entry_id,
             arxiv_updated=result.updated,
             arxiv_published=result.published,
