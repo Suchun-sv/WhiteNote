@@ -56,7 +56,7 @@ class JsonStore:
         # 建立已有 id 集合
         existing_ids = {p.id for p in existing if p.id}
 
-        inserted = 0
+        inserted_papers = []
 
         for p in new_papers:
             if not p.id:
@@ -69,7 +69,7 @@ class JsonStore:
 
             existing.append(p)
             existing_ids.add(p.id)
-            inserted += 1
+            inserted_papers.append(p)
 
         self._save_papers(existing)
-        return inserted
+        return inserted_papers

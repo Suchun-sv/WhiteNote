@@ -16,11 +16,22 @@ class ChatLiteLLMConfig(BaseModel):
     api_key: Annotated[str, Field(default="sk-proj-xxxx")]
     api_base: Annotated[str, Field(default="https://api.openai.com/v1")]
 
+class CocoIndexConfig(BaseModel):
+    chunk_size: Annotated[int, Field(default=800)]
+    embedding_model: Annotated[str, Field(default="openai/text-embedding-3-small")]
+    embedding_api_key: Annotated[str, Field(default="sk-proj-xxxx")]
+    embedding_api_base: Annotated[str, Field(default="https://api.openai.com/v1")]
+
 
 class QdrantConfig(BaseModel):
     host: Annotated[str, Field(default="localhost")]
     port: Annotated[int, Field(default=6333)]
     collection: Annotated[str, Field(default="lavender_papers")]
+
+class PdfDownloadConfig(BaseModel):
+    max_concurrency: Annotated[int, Field(default=8)]
+    timeout: Annotated[int, Field(default=30)]
+    retries: Annotated[int, Field(default=3)]
 
 
 class Settings(BaseSettings):
@@ -28,9 +39,12 @@ class Settings(BaseSettings):
     keywords: Annotated[List[str], Field(default=["vector database", "RAG", "agent"])]
 
     paper_save_path: Annotated[str, Field(default="cache/papers.json")]
+    pdf_save_path: Annotated[str, Field(default="cache/pdfs/")]
+    pdf_download: PdfDownloadConfig = Field(default_factory=PdfDownloadConfig)
     embedding_save_path: Annotated[str, Field(default="cache/embeddings/")] 
 
     chat_litellm: ChatLiteLLMConfig = Field(default_factory=ChatLiteLLMConfig)
+    cocoindex: CocoIndexConfig = Field(default_factory=CocoIndexConfig)
     qdrant_database: QdrantConfig = Field(default_factory=QdrantConfig)
 
     model_config = SettingsConfigDict(

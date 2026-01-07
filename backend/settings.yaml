@@ -9,6 +9,7 @@ keywords:
 
 paper_save_path: "cache/papers/"
 
+
 chat_litellm:
   model: "gpt-4o-mini"
   api_key: "XXXXX"

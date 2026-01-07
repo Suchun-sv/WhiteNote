@@ -13,7 +13,7 @@ class ArxivClient:
             num_retries=3,
         )
 
-    def search_papers(self, keywords: List[str], date_range: Tuple[datetime, datetime]) -> Dict[str, List[Paper]]:
+    def search_papers(self, keywords: List[str], date_range: Tuple[datetime, datetime] = None) -> Dict[str, List[Paper]]:
         """
         Result(
         entry_id: str,
@@ -50,13 +50,19 @@ class ArxivClient:
 
         return re.sub(r"v\d+", "", last)
     
+    def _get_pdf_url(self, result: arxiv.Result) -> str:
+        for link in result.links:
+            if "pdf" in link.href.lower():
+                return link.href
+        return ""
+    
     def _arxiv_result_to_paper(self, result: arxiv.Result, keyword: str) -> Paper:
         return Paper(
             id=self._normalize_arxiv_id(result.entry_id),
             title=result.title,
             abstract=result.summary,
             authors=[author.name for author in result.authors],
-            links=[link.href for link in result.links],
+            pdf_url=self._get_pdf_url(result),
             keywords=[keyword],
             created_at=datetime.now(),
             updated_at=datetime.now(),

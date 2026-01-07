@@ -3,9 +3,11 @@ name = "lavendersentinel"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "arxiv>=2.4.0",
+    "cocoindex>=0.3.24",
+    "litellm>=1.80.11",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.12.0",
     "pyyaml>=6.0.3",
