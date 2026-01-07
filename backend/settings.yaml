@@ -1,0 +1,61 @@
+# LavenderSentinel Backend Configuration
+# 此文件与 docker-compose.dev.yml 中的服务配置对应
+
+# ============================================
+# 数据库连接
+# ============================================
+
+# PostgreSQL (asyncpg 驱动)
+database_url: "postgresql+asyncpg://lavender:lavender_dev_password@localhost:5432/lavender_sentinel"
+
+# Redis
+redis_url: "redis://localhost:6379/0"
+
+# Qdrant 向量数据库
+qdrant_host: "localhost"
+qdrant_port: 6333
+qdrant_collection: "paper_embeddings"
+
+# CocoIndex (同步 PostgreSQL 连接)
+cocoindex_database_url: "postgresql://lavender:lavender_dev_password@localhost:5432/lavender_sentinel"
+
+# ============================================
+# LLM 配置 (使用 LiteLLM)
+# ============================================
+llm:
+  # 模型格式: "provider/model" 或 "model" (OpenAI)
+  # 示例:
+  #   - OpenAI: "gpt-4o-mini"
+  #   - Ollama: "ollama/llama3.2"
+  #   - Anthropic: "anthropic/claude-3-5-sonnet-20241022"
+  #   - OneAPI: "openai/gpt-4o" + 自定义 api_base
+  model: "gpt-4o-mini"
+  
+  # API 密钥 (Ollama 不需要)
+  # 建议通过环境变量设置: export OPENAI_API_KEY=xxx
+  api_key: null
+  
+  # 自定义 API 端点 (OneAPI, Ollama, 自部署等)
+  # Ollama 示例: "http://localhost:11434"
+  # OneAPI 示例: "https://your-oneapi-domain.com/v1"
+  api_base: null
+  
+  # 高级选项
+  temperature: 0.7
+  max_tokens: 2000
+  timeout: 60
+
+# ============================================
+# Embedding 配置
+# ============================================
+embedding:
+  # 本地模型 (sentence-transformers)
+  model: "BAAI/bge-base-en-v1.5"
+  dimension: 768
+  use_litellm: false
+  
+  # 或使用远程 API (取消注释)
+  # model: "text-embedding-3-small"
+  # api_key: null  # 或通过环境变量设置
+  # use_litellm: true
+

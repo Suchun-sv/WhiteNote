@@ -1,109 +1,147 @@
-"""FastAPI application entry point for LavenderSentinel."""
+"""
+FastAPI Application Entry Point
+
+Responsibilities:
+1. Create FastAPI application instance
+2. Register all API routers
+3. Configure middleware (CORS, logging, etc.)
+4. Setup startup/shutdown events (database connections, etc.)
+
+Run:
+    uvicorn app.main:app --reload
+"""
 
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.db.database import init_db, close_db
-from app.routers import api_router
-from app.core.exceptions import LavenderSentinelError
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan manager for startup and shutdown."""
-    # Startup
-    print(f"Starting {settings.app_name} v{settings.app_version}")
-    print(f"Environment: {settings.environment}")
+    """
+    Application lifespan manager
     
-    # Initialize database
-    await init_db()
-    print("Database initialized")
+    Handles startup and shutdown events:
+    - Startup: Initialize database connections, load models, etc.
+    - Shutdown: Close connections, cleanup resources
+    """
+    # === Startup ===
+    print("🚀 Starting LavenderSentinel API...")
+    print(f"   LLM Model: {settings.llm.model}")
+    print(f"   Embedding Model: {settings.embedding.model}")
+
+    from app.db.database import get_connections
+    connections = get_connections()
+
+    yield  # Application runs here
     
-    # Initialize CocoIndex (optional, can be done lazily)
-    try:
-        from app.indexing.pipeline import paper_indexer
-        paper_indexer.initialize()
-        print("CocoIndex initialized")
-    except Exception as e:
-        print(f"CocoIndex initialization skipped: {e}")
-    
-    yield
-    
-    # Shutdown
-    print("Shutting down...")
+    # === Shutdown ===
+    print("👋 Shutting down LavenderSentinel API...")
+    from app.db.database import close_db
     await close_db()
-    print("Database connections closed")
+    # TODO: Cleanup resources
 
 
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    app = FastAPI(
-        title=settings.app_name,
-        description="A system that automatically collects, indexes, and summarizes research papers with LLM-assisted conversation",
-        version=settings.app_version,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
-        openapi_url="/openapi.json" if settings.debug else None,
-        lifespan=lifespan,
-    )
+app = FastAPI(
+    title="LavenderSentinel API",
+    description="Academic literature automation system - collect, index, summarize, and chat with research papers",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # TODO: Configure for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ============== Health Check Routes ==============
+
+@app.get("/")
+async def root():
+    """Root endpoint - basic info"""
+    return {
+        "name": "LavenderSentinel API",
+        "version": "0.1.0",
+        "status": "running",
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for container orchestration"""
+    return {"status": "healthy"}
+
+
+@app.get("/config")
+async def get_config():
+    """Get current configuration (non-sensitive)"""
+    return {
+        "llm": {
+            "model": settings.llm.model,
+            "temperature": settings.llm.temperature,
+            "max_tokens": settings.llm.max_tokens,
+        },
+        "embedding": {
+            "model": settings.embedding.model,
+            "dimension": settings.embedding.dimension,
+            "use_litellm": settings.embedding.use_litellm,
+        },
+        "qdrant": {
+            "host": settings.qdrant_host,
+            "port": settings.qdrant_port,
+            "collection": settings.qdrant_collection,
+        },
+    }
+
+
+# ============== Test Routes ==============
+
+@app.get("/test/llm")
+async def test_llm(prompt: str = "Say hello in one sentence."):
+    """
+    Test LLM connection
     
-    # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    Args:
+        prompt: Test prompt to send to LLM
     
-    # Exception handlers
-    @app.exception_handler(LavenderSentinelError)
-    async def lavender_exception_handler(
-        request: Request,
-        exc: LavenderSentinelError,
-    ) -> JSONResponse:
-        """Handle custom LavenderSentinel exceptions."""
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": exc.message,
-                "details": exc.details,
-            },
+    Returns:
+        LLM response
+    """
+    from litellm import completion
+    
+    try:
+        response = completion(
+            messages=[{"role": "user", "content": prompt}],
+            **settings.llm.to_litellm_params()
         )
-    
-    # Include API router
-    app.include_router(api_router, prefix=settings.api_prefix)
-    
-    # Root endpoint
-    @app.get("/")
-    async def root() -> dict:
-        """Root endpoint with API information."""
         return {
-            "name": settings.app_name,
-            "version": settings.app_version,
-            "docs": f"{settings.api_prefix}/docs" if settings.debug else "disabled",
-            "health": f"{settings.api_prefix}/health",
+            "status": "success",
+            "model": settings.llm.model,
+            "response": response.choices[0].message.content,
+            "usage": {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+            }
         }
-    
-    return app
+    except Exception as e:
+        return {
+            "status": "error",
+            "model": settings.llm.model,
+            "error": str(e),
+        }
 
 
-# Create application instance
-app = create_app()
-
-
-if __name__ == "__main__":
-    import uvicorn
-    
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.debug,
-    )
-
+# TODO: Add routers
+# from app.routers import papers, search, chat
+# app.include_router(papers.router, prefix="/api/papers", tags=["papers"])
+# app.include_router(search.router, prefix="/api/search", tags=["search"])
+# app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
