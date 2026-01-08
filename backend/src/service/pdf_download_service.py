@@ -34,6 +34,9 @@ class PdfDownloader:
         return False
 
     def _download_one(self, url: str, file: Path):
+        if file.suffix != ".pdf":
+            file = file.with_suffix(".pdf")
+
         if file.exists():
             print(f"⏭ Skip (exists): {file.name}")
         else:
@@ -82,6 +85,10 @@ class PdfDownloader:
 
         print(f"⏱ Cooling {self.min_interval}s…\n")
         time.sleep(self.min_interval)
+    
+    def download_one(self, url: str, id: str):
+        file = Path(self.save_dir) / f"{id}.pdf"
+        self._download_one(url, file)
 
     def download_all(self, items: Iterable[tuple[str, str]]):
         items = list(items)
@@ -92,5 +99,5 @@ class PdfDownloader:
         print(f"📥 Total tasks: {len(items)}\n")
 
         for url, name in items:
-            file = self.save_dir / name
+            file = Path(self.save_dir) / name
             self._download_one(url, file)

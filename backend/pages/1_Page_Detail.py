@@ -11,6 +11,7 @@ from src.service.llm_service import (
     PaperChatState,
 )
 from src.service.pdf_parser_service import extract_pdf_markdown
+from src.service.pdf_download_service import PdfDownloader
 from src.config import Config
 
 
@@ -68,18 +69,21 @@ def main():
     with col_left:
         st.subheader("📄 Paper PDF")
 
-        pdf_path = Path("cache/pdfs") / f"{paper.id}.pdf"
+        # pdf_path = Path("cache/pdfs") / f"{paper.id}.pdf"
+        pdf_path = Path(Config.pdf_save_path) / f"{paper.id}.pdf"
 
         if not pdf_path.exists():
             st.warning("⚠ 当前 PDF 尚未下载")
             if st.button("📥 立即下载 PDF"):
-                st.info("（TODO：连接你的 PdfDownloader 后端任务）")
+                # st.info("（TODO：连接你的 PdfDownloader 后端任务）")
+                downloader = PdfDownloader()
+                print(f"https://arxiv.org/pdf/{paper.id}.pdf", paper.id)
+                downloader.download_one(f"https://arxiv.org/pdf/{paper.id}.pdf", paper.id)
+                st.success("已下载 PDF")
+                with st.spinner("⏳ 正在加载 PDF..."):
+                    pdf_viewer(pdf_path, width=900, height=2000)
         else:
             with st.spinner("⏳ 正在加载 PDF..."):
-                # with open(pdf_path, "rb") as f:
-                #     pdf_bytes = f.read()
-
-                # st.pdf(pdf_bytes, height=2000)
                 pdf_viewer(pdf_path, width=900, height=2000)
 
         # st.divider()

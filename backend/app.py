@@ -199,7 +199,7 @@ def main():
                     # 跳转到详情页，带 query_params
                     st.page_link(
                         "pages/1_Page_Detail.py",
-                        label="🔍 查看详情",
+                        label="查看详情",
                         icon="🔍",
                         query_params={"id": p.id},
                     )
