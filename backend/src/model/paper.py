@@ -23,6 +23,8 @@ class Paper(BaseModel):
     # pdf_url: Optional[HttpUrl] = None
 
     # AI 生成字段
+    ai_title: Optional[str] = None
+    ai_title_provider: Optional[str] = None
     ai_abstract: Optional[str] = None
     ai_abstract_provider: Optional[str] = None
     ai_summary: Optional[str] = None
