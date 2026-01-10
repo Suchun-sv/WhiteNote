@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, Callable, List
+from typing import Any, Dict, Callable, List, Optional
 from pathlib import Path
 
 import yaml
@@ -44,6 +44,14 @@ class FavoriteConfig(BaseModel):
     auto_generate_summary: Annotated[bool, Field(default=True)]  # 收藏后自动生成全文总结
 
 
+class RedisConfig(BaseModel):
+    """Redis 配置（用于 RQ 任务队列）"""
+    host: Annotated[str, Field(default="localhost")]
+    port: Annotated[int, Field(default=6379)]
+    db: Annotated[int, Field(default=0)]
+    password: Annotated[Optional[str], Field(default=None)]
+
+
 class Settings(BaseSettings):
     language: Annotated[str, Field(default="en")]
     source_list: Annotated[List[str], Field(default=["arXiv"])]
@@ -65,6 +73,7 @@ class Settings(BaseSettings):
 
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     favorite: FavoriteConfig = Field(default_factory=FavoriteConfig)
+    redis: RedisConfig = Field(default_factory=RedisConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",

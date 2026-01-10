@@ -12,7 +12,7 @@ favorite:
 scheduler:
   enabled: true
   timezone: "Asia/Shanghai"
-  daily_arxiv_job: "0 */1 * * *"
+  daily_arxiv_job: "0 */10 * * *"
 
 source_list: 
   - arXiv
@@ -37,3 +37,10 @@ qdrant_database:
   host: "localhost"
   port: 6333
   collection: "lavender_papers"
+
+# Redis (for RQ task queue)
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: null

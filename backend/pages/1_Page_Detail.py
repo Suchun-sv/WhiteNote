@@ -15,6 +15,7 @@ from src.service.pdf_parser_service import extract_pdf_markdown
 from src.service.pdf_download_service import PdfDownloader
 from src.jobs.paper_summary_job import SummaryJobStatus
 from src.config import Config
+from src.queue import enqueue_summary_job, get_queue_size, get_pending_jobs
 
 from streamlit_pdf_viewer import pdf_viewer
 
@@ -72,14 +73,14 @@ def _render_favorite_dislike_section(paper, repo: PaperRepository, scheduler: Sc
                 )
 
                 if selected_folder and st.button("➕ 添加到此收藏夹", key="add_to_folder"):
-                    _add_paper_to_folder(paper.id, selected_folder, repo, scheduler)
+                    _add_paper_to_folder(paper.id, selected_folder, repo)
                     st.rerun()
 
             # Create new folder
             st.markdown("---")
             new_folder_name = st.text_input("或创建新收藏夹", key="new_folder_name")
             if new_folder_name and st.button("✨ 创建并添加", key="create_folder"):
-                _add_paper_to_folder(paper.id, new_folder_name.strip(), repo, scheduler)
+                _add_paper_to_folder(paper.id, new_folder_name.strip(), repo)
                 st.rerun()
 
             # Remove from folder
@@ -110,8 +111,8 @@ def _render_favorite_dislike_section(paper, repo: PaperRepository, scheduler: Sc
                 st.rerun()
 
 
-def _add_paper_to_folder(paper_id: str, folder_name: str, repo: PaperRepository, scheduler: SchedulerService):
-    """Add paper to folder and trigger auto tasks if configured."""
+def _add_paper_to_folder(paper_id: str, folder_name: str, repo: PaperRepository):
+    """Add paper to folder and trigger auto tasks if configured (via RQ)."""
     from pathlib import Path
 
     added = repo.add_to_folder(paper_id, folder_name)
@@ -136,13 +137,11 @@ def _add_paper_to_folder(paper_id: str, folder_name: str, repo: PaperRepository,
                     st.warning(f"⚠️ PDF 下载失败: {e}")
 
         if Config.favorite.auto_generate_summary:
-            from src.jobs.paper_summary_job import SummaryJobStatus
-
             paper = repo.get_paper_by_id(paper_id)
             if paper and not paper.ai_summary:
                 repo.update_summary_job_status(paper_id, SummaryJobStatus.PENDING)
-                scheduler.add_paper_summary_job(paper_id)
-                st.info("🧠 已提交 AI 总结任务到后台队列")
+                enqueue_summary_job(paper_id)  # 使用 RQ 队列
+                st.info("🧠 已提交 AI 总结任务到 RQ 队列")
     else:
         st.info(f"论文已在「{folder_name}」中")
 
@@ -246,22 +245,21 @@ def main():
             with st.expander("查看 AI 全文总结", expanded=False):
                 st.write(paper.ai_summary)
 
-        # 获取任务状态和队列信息
+        # 获取任务状态和队列信息（使用 RQ）
         job_status = paper.summary_job_status
-        job_id = f"paper_summary_{paper.id}"
-        queue_size = scheduler.get_summary_queue_size()
+        queue_size = get_queue_size()
 
         # 显示任务状态
         if job_status == SummaryJobStatus.RUNNING:
             st.info("⏳ 正在后台生成全文总结，请稍候...")
             if queue_size > 0:
-                st.caption(f"📋 队列中还有 {queue_size} 个任务等待")
+                st.caption(f"📋 RQ 队列中还有 {queue_size} 个任务等待")
             if st.button("🔄 刷新状态"):
                 st.rerun()
 
         elif job_status == SummaryJobStatus.PENDING:
             # 计算当前任务在队列中的位置
-            queue_jobs = scheduler.get_summary_queue_jobs()
+            queue_jobs = get_pending_jobs()
             position = next(
                 (i + 1 for i, job in enumerate(queue_jobs) if job["paper_id"] == paper.id),
                 None
@@ -269,7 +267,7 @@ def main():
             if position:
                 st.info(f"📋 任务排队中（第 {position}/{len(queue_jobs)} 位），等待执行...")
             else:
-                st.info("📋 任务已加入队列，等待执行...")
+                st.info("📋 任务已加入 RQ 队列，等待执行...")
             if st.button("🔄 刷新状态"):
                 st.rerun()
 
@@ -278,7 +276,7 @@ def main():
 
         # 显示队列状态（仅当有任务在队列中时）
         if queue_size > 0 and job_status not in (SummaryJobStatus.RUNNING, SummaryJobStatus.PENDING):
-            st.caption(f"ℹ️ 当前队列中有 {queue_size} 个任务正在处理")
+            st.caption(f"ℹ️ RQ 队列中有 {queue_size} 个任务正在处理")
 
         # 提交任务按钮
         if job_status not in (SummaryJobStatus.RUNNING, SummaryJobStatus.PENDING):
@@ -286,12 +284,12 @@ def main():
                 if not pdf_path.exists():
                     st.warning("⚠ PDF 不存在，任务会自动下载")
 
-                # 设置状态为 pending 并提交任务
+                # 设置状态为 pending 并提交到 RQ 队列
                 repo.update_summary_job_status(paper.id, SummaryJobStatus.PENDING)
-                scheduler.add_paper_summary_job(paper.id)
+                enqueue_summary_job(paper.id)
 
-                new_queue_size = scheduler.get_summary_queue_size()
-                st.success(f"✅ 任务已提交到后台队列（当前队列: {new_queue_size} 个任务）")
+                new_queue_size = get_queue_size()
+                st.success(f"✅ 任务已提交到 RQ 队列（当前队列: {new_queue_size} 个任务）")
                 st.rerun()
 
         st.divider()

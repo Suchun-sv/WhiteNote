@@ -8,6 +8,7 @@ import streamlit as st
 from src.config import Config
 from src.database.paper_repository import PaperRepository
 from src.scheduler.scheduler_service import SchedulerService
+from src.queue import enqueue_summary_job
 
 
 # =====================================================
@@ -55,8 +56,8 @@ def _get_authors(paper):
     return list(authors)
 
 
-def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository, scheduler: SchedulerService):
-    """Trigger auto download PDF and summary when favoriting a paper."""
+def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository):
+    """Trigger auto download PDF and summary when favoriting a paper (via RQ)."""
     from pathlib import Path
     from src.service.pdf_download_service import PdfDownloader
     from src.jobs.paper_summary_job import SummaryJobStatus
@@ -74,7 +75,7 @@ def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository, scheduler
         paper = repo.get_paper_by_id(paper_id)
         if paper and not paper.ai_summary:
             repo.update_summary_job_status(paper_id, SummaryJobStatus.PENDING)
-            scheduler.add_paper_summary_job(paper_id)
+            enqueue_summary_job(paper_id)  # 使用 RQ 队列
 
 
 def _go_prev_page():
@@ -484,7 +485,7 @@ def main():
                                         repo.remove_from_folder(p.id, folder)
                                     else:
                                         repo.add_to_folder(p.id, folder)
-                                        _trigger_favorite_auto_tasks(p.id, repo, scheduler)
+                                        _trigger_favorite_auto_tasks(p.id, repo)
                                     st.rerun()
 
                         # 新建收藏夹
@@ -497,7 +498,7 @@ def main():
                         )
                         if new_folder and st.button("➕ 创建", key=f"create_fav_{p.id}"):
                             repo.add_to_folder(p.id, new_folder.strip())
-                            _trigger_favorite_auto_tasks(p.id, repo, scheduler)
+                            _trigger_favorite_auto_tasks(p.id, repo)
                             st.rerun()
 
                 with c4:

@@ -20,4 +20,7 @@ dependencies = [
     "streamlit-pdf-viewer>=0.0.26",
     "streamlit[pdf]>=1.52.2",
     "tqdm>=4.67.1",
+    "redis>=5.0.0",
+    "rq>=2.0.0",
+    "supervisor>=4.2.0",
 ]
