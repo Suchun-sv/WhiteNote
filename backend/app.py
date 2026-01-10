@@ -8,7 +8,7 @@ import streamlit as st
 from src.config import Config
 from src.database.paper_repository import PaperRepository
 from src.scheduler.scheduler_service import SchedulerService
-from src.queue import enqueue_summary_job
+from src.queue import enqueue_summary_job, enqueue_comic_job
 
 
 # =====================================================
@@ -57,10 +57,11 @@ def _get_authors(paper):
 
 
 def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository):
-    """Trigger auto download PDF and summary when favoriting a paper (via RQ)."""
+    """Trigger auto download PDF, summary, and comic when favoriting a paper (via RQ)."""
     from pathlib import Path
     from src.service.pdf_download_service import PdfDownloader
     from src.jobs.paper_summary_job import SummaryJobStatus
+    from src.service.image_generation_service import comic_exists
 
     if Config.favorite.auto_download_pdf:
         pdf_path = Path(Config.pdf_save_path) / f"{paper_id}.pdf"
@@ -76,6 +77,13 @@ def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository):
         if paper and not paper.ai_summary:
             repo.update_summary_job_status(paper_id, SummaryJobStatus.PENDING)
             enqueue_summary_job(paper_id)  # 使用 RQ 队列
+
+    if Config.favorite.auto_generate_image:
+        # 只在有内容（full_text/摘要/总结）时才生成漫画
+        paper = repo.get_paper_by_id(paper_id)
+        if paper and (paper.full_text or paper.ai_summary or paper.ai_abstract or paper.abstract):
+            if not comic_exists(paper_id):
+                enqueue_comic_job(paper_id)  # 使用 RQ 队列
 
 
 def _go_prev_page():

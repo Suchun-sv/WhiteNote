@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 from rq.job import Job, JobStatus
 from rq.registry import FinishedJobRegistry, FailedJobRegistry, StartedJobRegistry
 
-from .connection import get_redis_connection, get_summary_queue
+from .connection import get_redis_connection, get_summary_queue, get_comic_queue
 
 
 def enqueue_summary_job(paper_id: str) -> str:
@@ -33,6 +33,32 @@ def enqueue_summary_job(paper_id: str) -> str:
         run_paper_summary_job,
         paper_id,
         job_timeout='10h',      # 超时 10 h
+        result_ttl=86400,       # 结果保留 24 小时
+        failure_ttl=86400 * 7,  # 失败记录保留 7 天
+    )
+    
+    return job.id
+
+
+def enqueue_comic_job(paper_id: str) -> str:
+    """
+    提交论文漫画生成任务到队列
+    
+    Args:
+        paper_id: 论文 ID
+        
+    Returns:
+        job_id: RQ 任务 ID，可用于查询状态
+    """
+    # 延迟导入，避免循环依赖
+    from src.jobs.paper_comic_job import run_paper_comic_job
+    
+    queue = get_comic_queue()  # 使用 comic 专用队列
+    
+    job = queue.enqueue(
+        run_paper_comic_job,
+        paper_id,
+        job_timeout='10h',      # 超时 10 小时
         result_ttl=86400,       # 结果保留 24 小时
         failure_ttl=86400 * 7,  # 失败记录保留 7 天
     )
@@ -282,4 +308,142 @@ def get_started_jobs() -> List[Dict[str, Any]]:
             continue
     
     return jobs
+
+
+# ========================================
+# Comic Queue Functions
+# ========================================
+
+def get_comic_queue_stats() -> Dict[str, Any]:
+    """
+    获取 comic 队列的详细统计信息
+    """
+    queue = get_comic_queue()
+    conn = get_redis_connection()
+    
+    finished_registry = FinishedJobRegistry(queue=queue)
+    failed_registry = FailedJobRegistry(queue=queue)
+    started_registry = StartedJobRegistry(queue=queue)
+    
+    queued_count = len(queue)
+    started_count = len(started_registry)
+    finished_count = len(finished_registry)
+    failed_count = len(failed_registry)
+    
+    return {
+        "queued": queued_count,
+        "started": started_count,
+        "finished": finished_count,
+        "failed": failed_count,
+        "total": queued_count + started_count + finished_count + failed_count,
+    }
+
+
+def get_comic_pending_jobs() -> List[Dict[str, Any]]:
+    """
+    获取 comic 队列中所有等待的任务
+    """
+    queue = get_comic_queue()
+    
+    jobs = []
+    for job in queue.jobs:
+        jobs.append({
+            "job_id": job.id,
+            "paper_id": job.args[0] if job.args else None,
+            "enqueued_at": job.enqueued_at,
+            "status": job.get_status(),
+        })
+    
+    return jobs
+
+
+def get_comic_started_jobs() -> List[Dict[str, Any]]:
+    """
+    获取 comic 队列正在执行的任务
+    """
+    queue = get_comic_queue()
+    conn = get_redis_connection()
+    started_registry = StartedJobRegistry(queue=queue)
+    
+    jobs = []
+    for job_id in started_registry.get_job_ids():
+        try:
+            job = Job.fetch(job_id, connection=conn)
+            jobs.append({
+                "job_id": job.id,
+                "paper_id": job.args[0] if job.args else None,
+                "enqueued_at": job.enqueued_at,
+                "started_at": job.started_at,
+                "status": "started",
+            })
+        except Exception:
+            continue
+    
+    return jobs
+
+
+def get_comic_recent_finished_jobs(hours: int = 24) -> List[Dict[str, Any]]:
+    """
+    获取 comic 队列最近完成的任务
+    """
+    queue = get_comic_queue()
+    conn = get_redis_connection()
+    finished_registry = FinishedJobRegistry(queue=queue)
+    
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    
+    jobs = []
+    for job_id in finished_registry.get_job_ids():
+        try:
+            job = Job.fetch(job_id, connection=conn)
+            if job.ended_at and job.ended_at >= cutoff:
+                jobs.append({
+                    "job_id": job.id,
+                    "paper_id": job.args[0] if job.args else None,
+                    "enqueued_at": job.enqueued_at,
+                    "started_at": job.started_at,
+                    "ended_at": job.ended_at,
+                    "status": "finished",
+                })
+        except Exception:
+            continue
+    
+    jobs.sort(key=lambda x: x.get("ended_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return jobs
+
+
+def get_comic_failed_jobs() -> List[Dict[str, Any]]:
+    """
+    获取 comic 队列所有失败的任务
+    """
+    queue = get_comic_queue()
+    conn = get_redis_connection()
+    failed_registry = FailedJobRegistry(queue=queue)
+    
+    jobs = []
+    for job_id in failed_registry.get_job_ids():
+        try:
+            job = Job.fetch(job_id, connection=conn)
+            jobs.append({
+                "job_id": job.id,
+                "paper_id": job.args[0] if job.args else None,
+                "enqueued_at": job.enqueued_at,
+                "started_at": job.started_at,
+                "ended_at": job.ended_at,
+                "exc_info": job.exc_info,
+                "status": "failed",
+            })
+        except Exception:
+            continue
+    
+    jobs.sort(key=lambda x: x.get("ended_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return jobs
+
+
+def get_comic_queue_size() -> int:
+    """
+    获取 comic 队列中等待的任务数
+    """
+    queue = get_comic_queue()
+    return len(queue)
 

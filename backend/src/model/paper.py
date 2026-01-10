@@ -33,6 +33,7 @@ class Paper(BaseModel):
 
     # 任务状态字段 (pending | running | completed | failed)
     summary_job_status: Optional[str] = None
+    comic_job_status: Optional[str] = None
 
     # 收藏相关
     favorite_folders: List[str] = Field(default_factory=list)  # 所属收藏夹名称

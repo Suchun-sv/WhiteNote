@@ -14,8 +14,14 @@ from src.service.llm_service import (
 from src.service.pdf_parser_service import extract_pdf_markdown
 from src.service.pdf_download_service import PdfDownloader
 from src.jobs.paper_summary_job import SummaryJobStatus
+from src.jobs.paper_comic_job import ComicJobStatus
 from src.config import Config
-from src.queue import enqueue_summary_job, get_queue_size, get_pending_jobs
+from src.queue import (
+    enqueue_summary_job, enqueue_comic_job, 
+    get_queue_size, get_pending_jobs,
+    get_comic_queue_size, get_comic_pending_jobs,
+)
+from src.service.image_generation_service import get_existing_comic_path, comic_exists
 
 from streamlit_pdf_viewer import pdf_viewer
 
@@ -142,6 +148,13 @@ def _add_paper_to_folder(paper_id: str, folder_name: str, repo: PaperRepository)
                 repo.update_summary_job_status(paper_id, SummaryJobStatus.PENDING)
                 enqueue_summary_job(paper_id)  # 使用 RQ 队列
                 st.info("🧠 已提交 AI 总结任务到 RQ 队列")
+
+        if Config.favorite.auto_generate_image:
+            paper = repo.get_paper_by_id(paper_id)
+            if paper and (paper.full_text or paper.ai_summary or paper.ai_abstract or paper.abstract):
+                if not comic_exists(paper_id):
+                    enqueue_comic_job(paper_id)  # 使用 RQ 队列
+                    st.info("🎨 已提交漫画生成任务到 RQ 队列")
     else:
         st.info(f"论文已在「{folder_name}」中")
 
@@ -183,17 +196,9 @@ def main():
     st.divider()
 
     # ======================================================
-    # SIDEBAR — View Mode & Links
+    # SIDEBAR — Quick Links
     # ======================================================
     with st.sidebar:
-        st.markdown("### 📖 查看模式")
-        view_mode = st.radio(
-            "选择查看方式",
-            options=["🌐 arXiv HTML", "📄 本地 PDF"],
-            key="view_mode",
-            label_visibility="collapsed",
-        )
-        
         st.markdown("### 🔗 快捷链接")
         arxiv_html_url = f"https://arxiv.org/html/{paper.id}"
         st.link_button("🌐 arXiv HTML", arxiv_html_url, use_container_width=True)
@@ -294,6 +299,78 @@ def main():
 
         st.divider()
 
+        # ---------- AI COMIC ----------
+        st.markdown("#### 🎨 AI 漫画解读")
+
+        # 检查漫画是否存在
+        existing_comic = get_existing_comic_path(paper.id)
+        
+        # 获取任务状态和队列信息
+        comic_job_status = paper.comic_job_status
+        comic_queue_size = get_comic_queue_size()
+        
+        if existing_comic:
+            st.success("✅ 漫画已生成，请在右侧「漫画」标签页查看")
+            if st.button("🔄 重新生成漫画"):
+                repo.update_comic_job_status(paper.id, ComicJobStatus.PENDING)
+                enqueue_comic_job(paper.id)
+                st.success("✅ 漫画生成任务已提交到 RQ 队列")
+                st.rerun()
+        else:
+            # 显示任务状态
+            if comic_job_status == ComicJobStatus.RUNNING:
+                st.info("⏳ 正在后台生成漫画，请稍候...")
+                if comic_queue_size > 0:
+                    st.caption(f"📋 漫画队列中还有 {comic_queue_size} 个任务等待")
+                if st.button("🔄 刷新状态", key="refresh_comic"):
+                    st.rerun()
+
+            elif comic_job_status == ComicJobStatus.PENDING:
+                # 计算当前任务在队列中的位置
+                comic_queue_jobs = get_comic_pending_jobs()
+                position = next(
+                    (i + 1 for i, job in enumerate(comic_queue_jobs) if job["paper_id"] == paper.id),
+                    None
+                )
+                if position:
+                    st.info(f"📋 漫画任务排队中（第 {position}/{len(comic_queue_jobs)} 位），等待执行...")
+                else:
+                    st.info("📋 漫画任务已加入队列，等待执行...")
+                if st.button("🔄 刷新状态", key="refresh_comic"):
+                    st.rerun()
+
+            elif comic_job_status == ComicJobStatus.FAILED:
+                st.error("❌ 漫画生成失败，可以重试")
+
+            # 显示队列状态（仅当有任务在队列中时）
+            if comic_queue_size > 0 and comic_job_status not in (ComicJobStatus.RUNNING, ComicJobStatus.PENDING):
+                st.caption(f"ℹ️ 漫画队列中有 {comic_queue_size} 个任务正在处理")
+
+            # 检查是否有足够的内容
+            has_content = paper.full_text or paper.ai_summary or paper.ai_abstract or paper.abstract
+            
+            # 提交任务按钮
+            if comic_job_status not in (ComicJobStatus.RUNNING, ComicJobStatus.PENDING):
+                if has_content:
+                    # 显示将使用的内容来源
+                    if paper.full_text:
+                        st.caption("✅ 将使用论文全文生成")
+                    elif paper.ai_summary:
+                        st.caption("📋 将使用 AI 全文总结生成")
+                    else:
+                        st.caption("📋 将使用摘要生成")
+                    
+                    if st.button("🎨 生成漫画解读（后台任务）"):
+                        repo.update_comic_job_status(paper.id, ComicJobStatus.PENDING)
+                        enqueue_comic_job(paper.id)
+                        st.success("✅ 漫画生成任务已提交到 RQ 队列")
+                        st.info("💡 漫画生成可能需要几分钟，请稍后刷新查看")
+                        st.rerun()
+                else:
+                    st.warning("⚠️ 请先生成 AI 摘要或全文总结")
+
+        st.divider()
+
         # ---------- CHAT ----------
         st.markdown("#### 💬 Paper Chat Assistant")
 
@@ -322,15 +399,40 @@ def main():
                 st.rerun()
 
     # ======================================================
-    # RIGHT — PAPER VIEWER (HTML or PDF)
+    # RIGHT — CONTENT VIEWER (Tabs: Comic / HTML / PDF)
     # ======================================================
     with col_right:
-        if view_mode == "🌐 arXiv HTML":
-            st.subheader("🌐 arXiv HTML")
-            
-            # arXiv HTML 页面 URL
+        # 检查漫画是否存在
+        existing_comic = get_existing_comic_path(paper.id)
+        
+        # 根据是否有漫画调整 tab 顺序（默认显示第一个 tab）
+        if existing_comic:
+            # 有漫画时：漫画优先
+            tab_comic, tab_html, tab_pdf = st.tabs(["🎨 漫画", "🌐 arXiv HTML", "📄 本地 PDF"])
+        else:
+            # 没有漫画时：HTML 优先
+            tab_html, tab_comic, tab_pdf = st.tabs(["🌐 arXiv HTML", "🎨 漫画", "📄 本地 PDF"])
+        
+        # ---------- Tab: 漫画 ----------
+        with tab_comic:
+            if existing_comic:
+                st.image(str(existing_comic), use_container_width=True)
+            else:
+                # 显示漫画任务状态
+                comic_status = paper.comic_job_status
+                if comic_status == ComicJobStatus.RUNNING:
+                    st.info("⏳ 正在生成漫画，请稍候...")
+                elif comic_status == ComicJobStatus.PENDING:
+                    st.info("📋 漫画任务排队中...")
+                elif comic_status == ComicJobStatus.FAILED:
+                    st.error("❌ 漫画生成失败，请在左侧重试")
+                else:
+                    st.info("📝 漫画尚未生成，请在左侧点击「生成漫画解读」按钮")
+                st.caption("💡 生成后刷新页面即可查看")
+        
+        # ---------- Tab: arXiv HTML ----------
+        with tab_html:
             arxiv_html_url = f"https://arxiv.org/html/{paper.id}"
-            
             st.caption("💡 如果下方无法显示，请使用侧边栏的链接在新标签页打开")
             
             # 使用 HTML iframe 嵌入
@@ -344,12 +446,11 @@ def main():
             '''
             st.components.v1.html(iframe_html, height=1220)
         
-        else:
-            st.subheader("📄 Paper PDF")
-
+        # ---------- Tab: 本地 PDF ----------
+        with tab_pdf:
             if not pdf_path.exists():
                 st.warning("⚠ 当前 PDF 尚未下载")
-                if st.button("📥 立即下载 PDF"):
+                if st.button("📥 立即下载 PDF", key="download_pdf_tab"):
                     downloader = PdfDownloader()
                     downloader.download_one(
                         f"https://arxiv.org/pdf/{paper.id}.pdf",

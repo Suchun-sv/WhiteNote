@@ -319,6 +319,36 @@ class PaperRepository:
                 return None
             return row.paper.get("summary_job_status")
 
+    def update_comic_job_status(self, paper_id: str, status: str) -> None:
+        """
+        Update comic_job_status field.
+
+        Status values: pending | running | completed | failed
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return
+
+            paper = dict(row.paper)
+            paper["comic_job_status"] = status
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+
+    def get_comic_job_status(self, paper_id: str) -> Optional[str]:
+        """
+        Get comic_job_status for a paper.
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return None
+            return row.paper.get("comic_job_status")
+
     # =====================================================
     # Favorite folders
     # =====================================================

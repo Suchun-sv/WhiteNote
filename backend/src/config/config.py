@@ -42,6 +42,15 @@ class FavoriteConfig(BaseModel):
     """收藏功能配置"""
     auto_download_pdf: Annotated[bool, Field(default=True)]  # 收藏后自动下载PDF
     auto_generate_summary: Annotated[bool, Field(default=True)]  # 收藏后自动生成全文总结
+    auto_generate_image: Annotated[bool, Field(default=False)]  # 收藏后自动生成漫画解读
+
+
+class GeminiConfig(BaseModel):
+    """Gemini 配置（用于图片生成）"""
+    api_key: Annotated[str, Field(default="")]
+    # model: Annotated[str, Field(default="gemini-2.0-flash-preview-image-generation")]
+    model: Annotated[str, Field(default="gemini-3-pro-image-preview")]
+    image_size: Annotated[str, Field(default="1K")]  # "1K", "2K", "4K"
 
 
 class RedisConfig(BaseModel):
@@ -60,10 +69,11 @@ class Settings(BaseSettings):
     auto_ai_title: Annotated[bool, Field(default=True)]
     auto_ai_abstract: Annotated[bool, Field(default=True)]
 
-    database_url: Annotated[str, Field(default="postgresql://postgres:postgres@localhost:5432/lavender_sentinel")]
+    database_url: Annotated[str, Field(default="postgresql://lavender:lavender_password@localhost:5432/lavender_sentinel")]
 
     paper_save_path: Annotated[str, Field(default="cache/papers.json")]
     pdf_save_path: Annotated[str, Field(default="cache/pdfs/")]
+    image_save_path: Annotated[str, Field(default="cache/imgs/")]  # 漫画图片保存路径
     pdf_download: PdfDownloadConfig = Field(default_factory=PdfDownloadConfig)
     embedding_save_path: Annotated[str, Field(default="cache/embeddings/")] 
 
@@ -74,6 +84,7 @@ class Settings(BaseSettings):
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     favorite: FavoriteConfig = Field(default_factory=FavoriteConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
+    gemini: GeminiConfig = Field(default_factory=GeminiConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",

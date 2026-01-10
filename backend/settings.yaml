@@ -8,6 +8,17 @@ auto_ai_abstract: true
 favorite:
   auto_download_pdf: true       # 收藏后自动下载PDF
   auto_generate_summary: true   # 收藏后自动生成全文总结
+  auto_generate_image: true     # 收藏后自动生成漫画解读图
+
+# 漫画图片保存路径
+image_save_path: "cache/imgs/"
+
+# Gemini 配置（用于图片生成）
+gemini:
+  api_key: "YOUR_GEMINI_API_KEY"
+  # model: "gemini-2.0-flash-preview-image-generation"
+  model: "gemini-3-pro-image-preview"
+  image_size: "1K"  # 可选: "1K", "2K", "4K"
 
 scheduler:
   enabled: true
