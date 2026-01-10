@@ -284,3 +284,393 @@ class PaperRepository:
             row.updated_at = datetime.utcnow()
 
             db.commit()
+
+    # =====================================================
+    # Job status tracking
+    # =====================================================
+
+    def update_summary_job_status(self, paper_id: str, status: str) -> None:
+        """
+        Update summary_job_status field.
+
+        Status values: pending | running | completed | failed
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return
+
+            paper = dict(row.paper)
+            paper["summary_job_status"] = status
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+
+    def get_summary_job_status(self, paper_id: str) -> Optional[str]:
+        """
+        Get summary_job_status for a paper.
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return None
+            return row.paper.get("summary_job_status")
+
+    # =====================================================
+    # Favorite folders
+    # =====================================================
+
+    def add_to_folder(self, paper_id: str, folder_name: str) -> bool:
+        """
+        Add a paper to a favorite folder.
+
+        Returns:
+            True if added (was not already in folder), False otherwise
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return False
+
+            paper = dict(row.paper)
+            folders: List[str] = paper.get("favorite_folders") or []
+
+            if folder_name in folders:
+                return False  # Already in folder
+
+            folders.append(folder_name)
+            paper["favorite_folders"] = folders
+
+            # Set favorited_at if this is the first folder
+            if len(folders) == 1:
+                paper["favorited_at"] = datetime.utcnow().isoformat()
+
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+            return True
+
+    def remove_from_folder(self, paper_id: str, folder_name: str) -> bool:
+        """
+        Remove a paper from a favorite folder.
+
+        Returns:
+            True if removed, False if not found
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return False
+
+            paper = dict(row.paper)
+            folders: List[str] = paper.get("favorite_folders") or []
+
+            if folder_name not in folders:
+                return False
+
+            folders.remove(folder_name)
+            paper["favorite_folders"] = folders
+
+            # Clear favorited_at if no folders left
+            if not folders:
+                paper["favorited_at"] = None
+
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+            return True
+
+    def list_by_folder(self, folder_name: str) -> List[Paper]:
+        """
+        List all papers in a specific folder.
+        """
+        with SessionLocal() as db:
+            # Query papers where favorite_folders contains folder_name
+            rows = (
+                db.query(PaperRow)
+                .filter(
+                    PaperRow.paper["favorite_folders"].contains([folder_name])
+                )
+                .order_by(PaperRow.updated_at.desc())
+                .all()
+            )
+            return [Paper.model_validate(r.paper) for r in rows]
+
+    def get_all_folders(self) -> List[str]:
+        """
+        Get all unique folder names across all papers.
+        """
+        with SessionLocal() as db:
+            rows = db.query(PaperRow).all()
+
+            all_folders: set[str] = set()
+            for row in rows:
+                folders = row.paper.get("favorite_folders") or []
+                all_folders.update(folders)
+
+            return sorted(all_folders)
+
+    def get_folder_counts(self) -> dict[str, int]:
+        """
+        Get paper count for each folder.
+
+        Returns:
+            Dict mapping folder_name -> count
+        """
+        with SessionLocal() as db:
+            rows = db.query(PaperRow).all()
+
+            counts: dict[str, int] = {}
+            for row in rows:
+                folders = row.paper.get("favorite_folders") or []
+                for folder in folders:
+                    counts[folder] = counts.get(folder, 0) + 1
+
+            return counts
+
+    def rename_folder(self, old_name: str, new_name: str) -> int:
+        """
+        Rename a folder (batch update all related papers).
+
+        Args:
+            old_name: Current folder name
+            new_name: New folder name
+
+        Returns:
+            Number of papers affected
+        """
+        if not new_name or not new_name.strip():
+            return 0
+
+        new_name = new_name.strip()
+
+        if old_name == new_name:
+            return 0
+
+        with SessionLocal() as db:
+            # Find all papers with the old folder name
+            rows = (
+                db.query(PaperRow)
+                .filter(PaperRow.paper["favorite_folders"].contains([old_name]))
+                .all()
+            )
+
+            count = 0
+            for row in rows:
+                paper = dict(row.paper)
+                folders: List[str] = paper.get("favorite_folders") or []
+
+                if old_name in folders:
+                    # Replace old name with new name
+                    idx = folders.index(old_name)
+                    folders[idx] = new_name
+                    paper["favorite_folders"] = folders
+                    paper["updated_at"] = datetime.utcnow().isoformat()
+
+                    row.paper = paper
+                    row.updated_at = datetime.utcnow()
+                    count += 1
+
+            db.commit()
+            return count
+
+    def delete_folder(self, folder_name: str) -> int:
+        """
+        Delete a folder (remove from all papers).
+
+        Args:
+            folder_name: Folder name to delete
+
+        Returns:
+            Number of papers affected
+        """
+        with SessionLocal() as db:
+            # Find all papers with this folder
+            rows = (
+                db.query(PaperRow)
+                .filter(PaperRow.paper["favorite_folders"].contains([folder_name]))
+                .all()
+            )
+
+            count = 0
+            for row in rows:
+                paper = dict(row.paper)
+                folders: List[str] = paper.get("favorite_folders") or []
+
+                if folder_name in folders:
+                    folders.remove(folder_name)
+                    paper["favorite_folders"] = folders
+
+                    # Clear favorited_at if no folders left
+                    if not folders:
+                        paper["favorited_at"] = None
+
+                    paper["updated_at"] = datetime.utcnow().isoformat()
+
+                    row.paper = paper
+                    row.updated_at = datetime.utcnow()
+                    count += 1
+
+            db.commit()
+            return count
+
+    def create_empty_folder(self, folder_name: str) -> bool:
+        """
+        Create an empty folder placeholder.
+        
+        Note: Since folders are virtual (derived from papers),
+        we store empty folders in a special way - by adding
+        a marker. For simplicity, we just return True here
+        as folders are created when papers are added to them.
+        
+        Returns:
+            True (folder "created" - will appear when paper is added)
+        """
+        # Folders are virtual - they exist when at least one paper has them
+        # For "empty" folders, we could store them in a separate config,
+        # but for now, just return True as a no-op
+        return True
+
+    # =====================================================
+    # Dislike
+    # =====================================================
+
+    def mark_disliked(self, paper_id: str) -> None:
+        """
+        Mark a paper as disliked.
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return
+
+            paper = dict(row.paper)
+            paper["is_disliked"] = True
+            paper["disliked_at"] = datetime.utcnow().isoformat()
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+
+    def unmark_disliked(self, paper_id: str) -> None:
+        """
+        Remove dislike mark from a paper.
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return
+
+            paper = dict(row.paper)
+            paper["is_disliked"] = False
+            paper["disliked_at"] = None
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+
+    def list_with_filters(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "created_at",
+        order: str = "desc",
+        include_disliked: bool = False,
+        include_favorite: bool = False,
+        folder_filter: Optional[str] = None,
+    ) -> List[Paper]:
+        """
+        List papers with filters for disliked and folder.
+
+        Args:
+            page: Page number (1-indexed)
+            page_size: Number of items per page
+            sort_by: Field to sort by
+            order: 'asc' or 'desc'
+            include_disliked: If False, exclude disliked papers
+            include_favorite: If False, exclude favorite papers
+            folder_filter: If set, only return papers in this folder
+        """
+        with SessionLocal() as db:
+            query = db.query(PaperRow)
+
+            # Filter out disliked papers by default
+            if not include_disliked:
+                query = query.filter(
+                    or_(
+                        PaperRow.paper["is_disliked"].is_(None),
+                        PaperRow.paper["is_disliked"].astext == "false",
+                    )
+                )
+
+            # Filter by folder (takes priority over include_favorite)
+            if folder_filter:
+                # 当指定收藏夹时，只看该收藏夹内的论文
+                query = query.filter(
+                    PaperRow.paper["favorite_folders"].contains([folder_filter])
+                )
+            elif not include_favorite:
+                # 只有在没有指定收藏夹筛选时，才过滤掉收藏的论文
+                query = query.filter(
+                    or_(
+                        PaperRow.paper["favorite_folders"].is_(None),
+                        PaperRow.paper["favorite_folders"].astext == "[]",
+                    )
+                )
+
+            # Sorting
+            sort_col = getattr(PaperRow, sort_by, PaperRow.created_at)
+            query = (
+                query.order_by(sort_col.desc())
+                if order == "desc"
+                else query.order_by(sort_col.asc())
+            )
+
+            # Pagination
+            rows = (
+                query
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+                .all()
+            )
+
+            return [Paper.model_validate(r.paper) for r in rows]
+
+    def count_with_filters(
+        self,
+        include_disliked: bool = False,
+        folder_filter: Optional[str] = None,
+    ) -> int:
+        """
+        Count papers with filters (for pagination).
+        """
+        with SessionLocal() as db:
+            query = db.query(PaperRow)
+
+            if not include_disliked:
+                query = query.filter(
+                    or_(
+                        PaperRow.paper["is_disliked"].is_(None),
+                        PaperRow.paper["is_disliked"].astext == "false",
+                    )
+                )
+
+            if folder_filter:
+                query = query.filter(
+                    PaperRow.paper["favorite_folders"].contains([folder_filter])
+                )
+
+            return query.count()

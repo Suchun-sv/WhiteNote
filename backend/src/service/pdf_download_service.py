@@ -83,8 +83,8 @@ class PdfDownloader:
                     print(f"⏳ Retry in {wait}s...")
                     time.sleep(wait)
 
-        print(f"⏱ Cooling {self.min_interval}s…\n")
-        time.sleep(self.min_interval)
+        # print(f"⏱ Cooling {self.min_interval}s…\n")
+        # time.sleep(self.min_interval)
     
     def download_one(self, url: str, id: str):
         file = Path(self.save_dir) / f"{id}.pdf"

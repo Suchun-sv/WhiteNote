@@ -4,6 +4,11 @@ language: "中文（简体）！！！"
 auto_ai_title: true
 auto_ai_abstract: true
 
+# 收藏功能配置
+favorite:
+  auto_download_pdf: true       # 收藏后自动下载PDF
+  auto_generate_summary: true   # 收藏后自动生成全文总结
+
 scheduler:
   enabled: true
   timezone: "Asia/Shanghai"

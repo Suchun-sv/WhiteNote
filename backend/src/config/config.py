@@ -38,6 +38,12 @@ class PdfDownloadConfig(BaseModel):
     retries: Annotated[int, Field(default=3)]
 
 
+class FavoriteConfig(BaseModel):
+    """收藏功能配置"""
+    auto_download_pdf: Annotated[bool, Field(default=True)]  # 收藏后自动下载PDF
+    auto_generate_summary: Annotated[bool, Field(default=True)]  # 收藏后自动生成全文总结
+
+
 class Settings(BaseSettings):
     language: Annotated[str, Field(default="en")]
     source_list: Annotated[List[str], Field(default=["arXiv"])]
@@ -58,6 +64,7 @@ class Settings(BaseSettings):
     qdrant_database: QdrantConfig = Field(default_factory=QdrantConfig)
 
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
+    favorite: FavoriteConfig = Field(default_factory=FavoriteConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",

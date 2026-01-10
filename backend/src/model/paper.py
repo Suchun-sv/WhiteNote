@@ -31,6 +31,17 @@ class Paper(BaseModel):
     ai_embedding_doc: Optional[str] = None
     ai_summary_provider: Optional[str] = None
 
+    # 任务状态字段 (pending | running | completed | failed)
+    summary_job_status: Optional[str] = None
+
+    # 收藏相关
+    favorite_folders: List[str] = Field(default_factory=list)  # 所属收藏夹名称
+    favorited_at: Optional[str] = None  # 首次收藏时间
+
+    # 不喜欢
+    is_disliked: bool = False
+    disliked_at: Optional[str] = None
+
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
