@@ -1,5 +1,19 @@
 # currently only support arXiv
 language: "中文（简体）！！！"
+
+auto_ai_title: true
+auto_ai_abstract: true
+
+# 收藏功能配置
+favorite:
+  auto_download_pdf: true       # 收藏后自动下载PDF
+  auto_generate_summary: true   # 收藏后自动生成全文总结
+
+scheduler:
+  enabled: true
+  timezone: "Asia/Shanghai"
+  daily_arxiv_job: "0 */10 * * *"
+
 source_list: 
   - arXiv
 
@@ -9,7 +23,6 @@ keywords:
   - "agent"
 
 paper_save_path: "cache/papers.json"
-
 
 chat_litellm:
   model: "gpt-4o-mini"
@@ -25,3 +38,9 @@ qdrant_database:
   port: 6333
   collection: "lavender_papers"
 
+# Redis (for RQ task queue)
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
+  password: null

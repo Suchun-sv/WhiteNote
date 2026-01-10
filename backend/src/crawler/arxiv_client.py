@@ -1,8 +1,7 @@
 import arxiv
 from ..model.paper import Paper
-from ..config import Config
 
-from typing import List, Tuple, Dict
+from typing import List, Dict
 from datetime import datetime
 
 class ArxivClient:
@@ -13,7 +12,7 @@ class ArxivClient:
             num_retries=3,
         )
 
-    def search_papers(self, keywords: List[str], date_range: Tuple[datetime, datetime] = None) -> Dict[str, List[Paper]]:
+    def search_papers(self, keywords: List[str], max_results: int = 100, sort_by: arxiv.SortCriterion = arxiv.SortCriterion.Relevance) -> Dict[str, List[Paper]]:
         """
         Result(
         entry_id: str,
@@ -36,8 +35,8 @@ class ArxivClient:
             keywords_papers[keyword] = []
             search_query = arxiv.Search(
                 query=keyword,
-                max_results=100,
-                sort_by=arxiv.SortCriterion.Relevance,   
+                max_results=max_results,
+                sort_by=sort_by,   
                 sort_order=arxiv.SortOrder.Descending,
             )
             results = self.arxiv_client.results(search_query)
@@ -64,8 +63,8 @@ class ArxivClient:
             authors=[author.name for author in result.authors],
             pdf_url=self._get_pdf_url(result),
             keywords=[keyword],
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=str(datetime.utcnow().isoformat()),
+            updated_at=str(datetime.utcnow().isoformat()),
             arxiv_entry_id=result.entry_id,
             arxiv_updated=result.updated,
             arxiv_published=result.published,

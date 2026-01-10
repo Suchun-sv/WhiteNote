@@ -46,6 +46,18 @@ def llm_chat(messages: List[Dict]) -> str:
     return resp.choices[0].message.content
 
 
+def translate_title(title_text: str, target_lang: str = "zh") -> str:
+    prompt = f"""
+你是一名严谨的学术翻译助手，请将下面的学术标题翻译成 {target_lang}，要求：
+- 保持术语准确
+- 不要添加个人评论
+
+原文标题：
+{title_text}
+"""
+    return llm_completion(prompt.strip())
+
+
 # =========================================================
 # 🔹 2. 摘要翻译
 # =========================================================

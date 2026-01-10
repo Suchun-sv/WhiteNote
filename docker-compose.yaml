@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_USER: lavender
       POSTGRES_PASSWORD: lavender_password
-      POSTGRES_DB: cocoindex
+      POSTGRES_DB: lavender_sentinel
     ports:
       - "5432:5432"
     volumes:
@@ -25,6 +25,22 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  redis:
+    image: redis:7-alpine
+    container_name: lavender-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes  # 开启持久化
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   qdrant_data:
+  redis_data:
