@@ -68,8 +68,7 @@ def run_paper_summary_job(paper_id: str) -> None:
 
         # --- Step 2: 解析 PDF ---
         logger.info(f"📄 Extracting markdown from PDF...")
-        with open(pdf_path, "rb") as f:
-            md_text = extract_pdf_markdown(f.read())
+        md_text = extract_pdf_markdown(pdf_path)
 
         # 保存全文
         repo.update_full_text(paper_id, md_text)

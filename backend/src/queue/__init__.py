@@ -9,8 +9,9 @@ RQ (Redis Queue) 任务队列模块
 - 任务提交封装
 """
 
-from .connection import get_redis_connection, get_queue, QUEUE_SUMMARY, QUEUE_DEFAULT
+from .connection import get_redis_connection, get_queue, QUEUE_SUMMARY, QUEUE_COMIC, QUEUE_DEFAULT
 from .tasks import (
+    # Summary queue
     enqueue_summary_job,
     get_job_status,
     get_queue_size,
@@ -21,6 +22,14 @@ from .tasks import (
     get_started_jobs,
     cancel_job,
     retry_failed_job,
+    # Comic queue
+    enqueue_comic_job,
+    get_comic_queue_stats,
+    get_comic_pending_jobs,
+    get_comic_started_jobs,
+    get_comic_recent_finished_jobs,
+    get_comic_failed_jobs,
+    get_comic_queue_size,
 )
 
 __all__ = [
@@ -28,8 +37,9 @@ __all__ = [
     "get_redis_connection",
     "get_queue",
     "QUEUE_SUMMARY",
+    "QUEUE_COMIC",
     "QUEUE_DEFAULT",
-    # 任务
+    # Summary 任务
     "enqueue_summary_job",
     "get_job_status",
     "get_queue_size",
@@ -40,5 +50,13 @@ __all__ = [
     "get_started_jobs",
     "cancel_job",
     "retry_failed_job",
+    # Comic 任务
+    "enqueue_comic_job",
+    "get_comic_queue_stats",
+    "get_comic_pending_jobs",
+    "get_comic_started_jobs",
+    "get_comic_recent_finished_jobs",
+    "get_comic_failed_jobs",
+    "get_comic_queue_size",
 ]
 

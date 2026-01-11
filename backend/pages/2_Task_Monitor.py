@@ -16,6 +16,7 @@ from typing import Optional
 
 from src.scheduler.scheduler_service import SchedulerService
 from src.queue import (
+    # Summary queue
     get_queue_stats,
     get_pending_jobs,
     get_started_jobs,
@@ -23,6 +24,12 @@ from src.queue import (
     get_failed_jobs,
     cancel_job,
     retry_failed_job,
+    # Comic queue
+    get_comic_queue_stats,
+    get_comic_pending_jobs,
+    get_comic_started_jobs,
+    get_comic_recent_finished_jobs,
+    get_comic_failed_jobs,
 )
 
 
@@ -74,12 +81,12 @@ def main():
     )
     
     st.title("📊 任务监控中心")
-    st.caption("监控 arXiv 抓取任务和 AI 总结队列")
+    st.caption("监控 arXiv 抓取任务、AI 总结队列和漫画生成队列")
     
     # 刷新按钮
     col_refresh, col_spacer = st.columns([1, 5])
     with col_refresh:
-        if st.button("🔄 刷新", use_container_width=True):
+        if st.button("🔄 刷新", width="stretch"):
             st.rerun()
     
     st.divider()
@@ -90,45 +97,39 @@ def main():
     st.subheader("📈 队列概览")
     
     try:
-        stats = get_queue_stats()
-        recent_finished = get_recent_finished_jobs(hours=24)
+        # Summary 队列
+        summary_stats = get_queue_stats()
+        summary_recent = get_recent_finished_jobs(hours=24)
         
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Comic 队列
+        comic_stats = get_comic_queue_stats()
+        comic_recent = get_comic_recent_finished_jobs(hours=24)
+        
+        # Summary 统计
+        st.markdown("##### 🧠 AI 总结队列")
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric(
-                label="⏳ 等待中",
-                value=stats["queued"],
-                help="队列中等待执行的任务数",
-            )
-        
+            st.metric(label="⏳ 等待中", value=summary_stats["queued"])
         with col2:
-            st.metric(
-                label="🔄 执行中",
-                value=stats["started"],
-                help="正在执行的任务数",
-            )
-        
+            st.metric(label="🔄 执行中", value=summary_stats["started"])
         with col3:
-            st.metric(
-                label="✅ 24h 完成",
-                value=len(recent_finished),
-                help="最近 24 小时完成的任务数",
-            )
-        
+            st.metric(label="✅ 24h 完成", value=len(summary_recent))
         with col4:
-            st.metric(
-                label="❌ 失败",
-                value=stats["failed"],
-                help="失败的任务数",
-            )
+            st.metric(label="❌ 失败", value=summary_stats["failed"])
         
-        with col5:
-            st.metric(
-                label="📊 总计（含历史）",
-                value=stats["total"],
-                help="所有任务数（包含已完成和失败）",
-            )
+        # Comic 统计
+        st.markdown("##### 🎨 漫画生成队列")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(label="⏳ 等待中", value=comic_stats["queued"])
+        with col2:
+            st.metric(label="🔄 执行中", value=comic_stats["started"])
+        with col3:
+            st.metric(label="✅ 24h 完成", value=len(comic_recent))
+        with col4:
+            st.metric(label="❌ 失败", value=comic_stats["failed"])
     
     except Exception as e:
         st.error(f"⚠️ 无法连接 Redis: {e}")
@@ -160,7 +161,7 @@ def main():
                     st.caption(f"触发器: `{trigger_str}`")
                 
                 with col_action:
-                    if st.button("▶️ 立即执行", key=f"run_{job.id}", use_container_width=True):
+                    if st.button("▶️ 立即执行", key=f"run_{job.id}", width="stretch"):
                         try:
                             job.func()
                             st.success("任务已触发")
@@ -173,7 +174,27 @@ def main():
     # ========================================
     # 3. RQ 队列详情
     # ========================================
-    st.subheader("📋 AI 总结队列（RQ）")
+    st.subheader("📋 RQ 队列详情")
+    
+    # 选择队列类型
+    queue_type = st.radio(
+        "选择队列",
+        options=["🧠 AI 总结", "🎨 漫画生成"],
+        horizontal=True,
+        key="queue_type_selector",
+    )
+    
+    # 根据选择获取对应的函数
+    if queue_type == "🧠 AI 总结":
+        _get_pending = get_pending_jobs
+        _get_started = get_started_jobs
+        _get_finished = get_recent_finished_jobs
+        _get_failed = get_failed_jobs
+    else:
+        _get_pending = get_comic_pending_jobs
+        _get_started = get_comic_started_jobs
+        _get_finished = get_comic_recent_finished_jobs
+        _get_failed = get_comic_failed_jobs
     
     tab_pending, tab_running, tab_finished, tab_failed = st.tabs([
         "⏳ 等待中", "🔄 执行中", "✅ 已完成", "❌ 失败"
@@ -182,7 +203,7 @@ def main():
     # --- 等待中的任务 ---
     with tab_pending:
         try:
-            pending_jobs = get_pending_jobs()
+            pending_jobs = _get_pending()
             
             if not pending_jobs:
                 st.info("队列为空，没有等待中的任务")
@@ -198,7 +219,7 @@ def main():
                             st.caption(f"入队时间: {_format_datetime(job['enqueued_at'])}")
                         
                         with col3:
-                            if st.button("❌ 取消", key=f"cancel_{job['job_id']}", use_container_width=True):
+                            if st.button("❌ 取消", key=f"cancel_{queue_type}_{job['job_id']}", width="stretch"):
                                 if cancel_job(job['job_id']):
                                     st.success("已取消")
                                     st.rerun()
@@ -210,7 +231,7 @@ def main():
     # --- 执行中的任务 ---
     with tab_running:
         try:
-            started_jobs = get_started_jobs()
+            started_jobs = _get_started()
             
             if not started_jobs:
                 st.info("当前没有正在执行的任务")
@@ -235,7 +256,7 @@ def main():
     # --- 已完成的任务 ---
     with tab_finished:
         try:
-            finished_jobs = get_recent_finished_jobs(hours=24)
+            finished_jobs = _get_finished(hours=24)
             
             if not finished_jobs:
                 st.info("最近 24 小时没有完成的任务")
@@ -263,7 +284,7 @@ def main():
     # --- 失败的任务 ---
     with tab_failed:
         try:
-            failed_jobs = get_failed_jobs()
+            failed_jobs = _get_failed()
             
             if not failed_jobs:
                 st.success("没有失败的任务 🎉")
@@ -284,7 +305,7 @@ def main():
                                     st.code(job['exc_info'], language="python")
                         
                         with col2:
-                            if st.button("🔄 重试", key=f"retry_{job['job_id']}", use_container_width=True):
+                            if st.button("🔄 重试", key=f"retry_{queue_type}_{job['job_id']}", width="stretch"):
                                 result = retry_failed_job(job['job_id'])
                                 if result:
                                     st.success("已重新入队")

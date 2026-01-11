@@ -8,7 +8,7 @@ import streamlit as st
 from src.config import Config
 from src.database.paper_repository import PaperRepository
 from src.scheduler.scheduler_service import SchedulerService
-from src.queue import enqueue_summary_job
+from src.queue import enqueue_summary_job, enqueue_comic_job
 
 
 # =====================================================
@@ -57,10 +57,11 @@ def _get_authors(paper):
 
 
 def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository):
-    """Trigger auto download PDF and summary when favoriting a paper (via RQ)."""
+    """Trigger auto download PDF, summary, and comic when favoriting a paper (via RQ)."""
     from pathlib import Path
     from src.service.pdf_download_service import PdfDownloader
     from src.jobs.paper_summary_job import SummaryJobStatus
+    from src.service.image_generation_service import comic_exists
 
     if Config.favorite.auto_download_pdf:
         pdf_path = Path(Config.pdf_save_path) / f"{paper_id}.pdf"
@@ -76,6 +77,13 @@ def _trigger_favorite_auto_tasks(paper_id: str, repo: PaperRepository):
         if paper and not paper.ai_summary:
             repo.update_summary_job_status(paper_id, SummaryJobStatus.PENDING)
             enqueue_summary_job(paper_id)  # 使用 RQ 队列
+
+    if Config.favorite.auto_generate_image:
+        # 只在有内容（full_text/摘要/总结）时才生成漫画
+        paper = repo.get_paper_by_id(paper_id)
+        if paper and (paper.full_text or paper.ai_summary or paper.ai_abstract or paper.abstract):
+            if not comic_exists(paper_id):
+                enqueue_comic_job(paper_id)  # 使用 RQ 队列
 
 
 def _go_prev_page():
@@ -148,7 +156,7 @@ def _render_pagination(total: int, position: str = "top") -> int:
             "⬅ 上一页",
             key=f"prev_{position}",
             disabled=current_page <= 1,
-            use_container_width=True,
+            width="stretch",
             on_click=_go_prev_page,
         )
     
@@ -173,7 +181,7 @@ def _render_pagination(total: int, position: str = "top") -> int:
             "下一页 ➡",
             key=f"next_{position}",
             disabled=st.session_state.current_page >= total_pages,
-            use_container_width=True,
+            width="stretch",
             on_click=_go_next_page,
             args=(total_pages,),
         )
@@ -248,7 +256,7 @@ def main():
         if st.button(
             "📚 全部论文",
             key="folder_all",
-            use_container_width=True,
+            width="stretch",
             type="primary" if folder_filter is None else "secondary",
         ):
             st.session_state.folder_filter = None
@@ -264,14 +272,14 @@ def main():
                 if st.button(
                     f"⭐ {folder} ({folder_counts[folder]})",
                     key=f"folder_select_{folder}",
-                    use_container_width=True,
+                    width="stretch",
                     type=btn_type,
                 ):
                     st.session_state.folder_filter = folder
                     st.rerun()
 
             with col_manage:
-                with st.popover("⚙", use_container_width=True):
+                with st.popover("⚙", width="stretch"):
                     st.markdown(f"**管理「{folder}」**")
 
                     # 重命名
@@ -465,11 +473,11 @@ def main():
                     st.link_button(
                         "PDF",
                         f"https://arxiv.org/pdf/{p.id}.pdf",
-                        use_container_width=True,
+                        width="stretch",
                     )
                 with c3:
                     # 收藏夹快速操作
-                    with st.popover("⭐", use_container_width=True):
+                    with st.popover("⭐", width="stretch"):
                         st.markdown("**添加到收藏夹**")
                         # 已有收藏夹
                         if all_folders:
@@ -479,7 +487,7 @@ def main():
                                 if st.button(
                                     label,
                                     key=f"toggle_fav_{p.id}_{folder}",
-                                    use_container_width=True,
+                                    width="stretch",
                                 ):
                                     if is_in:
                                         repo.remove_from_folder(p.id, folder)

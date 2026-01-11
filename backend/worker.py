@@ -26,6 +26,7 @@ from src.queue.connection import (
     get_redis_connection,
     get_queue,
     QUEUE_SUMMARY,
+    QUEUE_COMIC,
     QUEUE_DEFAULT,
 )
 
@@ -50,6 +51,7 @@ def main():
     # 定义要监听的队列（按优先级排序）
     queues = [
         get_queue(QUEUE_SUMMARY),
+        get_queue(QUEUE_COMIC),
         get_queue(QUEUE_DEFAULT),
     ]
     

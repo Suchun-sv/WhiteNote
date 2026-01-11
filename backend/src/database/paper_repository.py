@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Optional, Any, Union
+import re
+from typing import List, Optional, Any, Union, Dict
 from datetime import datetime
 
 from sqlalchemy import select, or_
@@ -9,6 +10,27 @@ from sqlalchemy.orm import Session
 from src.model.paper import Paper
 from src.database.db.session import SessionLocal
 from src.database.db.models import PaperRow
+
+
+def _sanitize_for_jsonb(obj: Any) -> Any:
+    """
+    递归清理对象中的不安全字符（用于 PostgreSQL JSONB）。
+    
+    处理：
+    - NULL 字符 (\u0000)
+    - 其他控制字符
+    """
+    if isinstance(obj, str):
+        # 移除 NULL 字符和其他控制字符
+        obj = obj.replace('\u0000', '')
+        obj = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', obj)
+        return obj
+    elif isinstance(obj, dict):
+        return {k: _sanitize_for_jsonb(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_sanitize_for_jsonb(item) for item in obj]
+    else:
+        return obj
 
 
 class PaperRepository:
@@ -28,9 +50,12 @@ class PaperRepository:
         Insert or update a Paper (full overwrite).
         """
         with SessionLocal() as db:
+            # 清理 JSONB 不支持的字符
+            paper_data = _sanitize_for_jsonb(paper.model_dump(mode="json"))
+            
             row = PaperRow(
                 id=paper.id,
-                paper=paper.model_dump(mode="json"),  
+                paper=paper_data,  
                 title=paper.title,
                 created_at=paper.created_at,
                 updated_at=datetime.utcnow(),
@@ -125,6 +150,9 @@ class PaperRepository:
             if isinstance(value, datetime):
                 value = value.isoformat()
 
+            # 清理不安全字符
+            value = _sanitize_for_jsonb(value)
+
             paper[field] = value
             paper["updated_at"] = datetime.utcnow().isoformat()
 
@@ -196,7 +224,7 @@ class PaperRepository:
                 return
 
             paper = dict(row.paper)
-            paper["ai_abstract"] = ai_abstract
+            paper["ai_abstract"] = _sanitize_for_jsonb(ai_abstract)
             paper["ai_abstract_provider"] = provider
             paper["updated_at"] = datetime.utcnow().isoformat()
 
@@ -229,7 +257,7 @@ class PaperRepository:
                 return
 
             paper = dict(row.paper)   # ⭐ 拷贝一份新的 dict
-            paper["ai_title"] = ai_title
+            paper["ai_title"] = _sanitize_for_jsonb(ai_title)
             paper["ai_title_provider"] = provider
             paper["updated_at"] = datetime.utcnow().isoformat()
 
@@ -276,7 +304,7 @@ class PaperRepository:
                 return
 
             paper = dict(row.paper)
-            paper["ai_summary"] = ai_summary
+            paper["ai_summary"] = _sanitize_for_jsonb(ai_summary)
             paper["ai_summary_provider"] = provider
             paper["updated_at"] = datetime.utcnow().isoformat()
 
@@ -318,6 +346,36 @@ class PaperRepository:
             if not row:
                 return None
             return row.paper.get("summary_job_status")
+
+    def update_comic_job_status(self, paper_id: str, status: str) -> None:
+        """
+        Update comic_job_status field.
+
+        Status values: pending | running | completed | failed
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return
+
+            paper = dict(row.paper)
+            paper["comic_job_status"] = status
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+
+    def get_comic_job_status(self, paper_id: str) -> Optional[str]:
+        """
+        Get comic_job_status for a paper.
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return None
+            return row.paper.get("comic_job_status")
 
     # =====================================================
     # Favorite folders
