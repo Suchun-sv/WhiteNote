@@ -324,8 +324,8 @@ def main():
     
     log_dir = Path(__file__).parent.parent / "logs"
     
-    log_tab1, log_tab2 = st.tabs([
-        "🔵 RQ Worker", "⚙️ Supervisor"
+    log_tab1, log_tab2, log_tab3 = st.tabs([
+        "🔵 RQ Worker (Stdout)", "🔴 RQ Worker (Error)", "⚙️ Supervisor"
     ])
     
     # 日志行数选择
@@ -334,11 +334,16 @@ def main():
         tail_lines = st.slider("显示最近行数", min_value=20, max_value=500, value=100, step=20)
     
     with log_tab1:
-        log_path = log_dir / "rq-worker-error.log"
+        log_path = log_dir / "rq-worker.log"
         log_content = _read_log_file(log_path, tail_lines)
         st.code(log_content, language="log", line_numbers=True)
     
     with log_tab2:
+        log_path = log_dir / "rq-worker-error.log"
+        log_content = _read_log_file(log_path, tail_lines)
+        st.code(log_content, language="log", line_numbers=True)
+    
+    with log_tab3:
         log_path = log_dir / "supervisord.log"
         log_content = _read_log_file(log_path, tail_lines)
         st.code(log_content, language="log", line_numbers=True)
