@@ -22,6 +22,8 @@ class PaperCardResponse(BaseModel):
     arxiv_categories: Optional[List[str]] = None
     created_at: str
     arxiv_published: Optional[datetime] = None
+    favorite_folders: List[str] = []
+    is_disliked: bool = False
 
     @classmethod
     def from_paper(cls, paper: Paper) -> PaperCardResponse:
@@ -36,6 +38,8 @@ class PaperCardResponse(BaseModel):
             arxiv_categories=paper.arxiv_categories,
             created_at=paper.created_at,
             arxiv_published=paper.arxiv_published,
+            favorite_folders=paper.favorite_folders or [],
+            is_disliked=paper.is_disliked or False,
         )
 
 

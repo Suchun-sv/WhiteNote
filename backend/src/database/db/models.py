@@ -42,6 +42,14 @@ class PaperUserMeta(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
 
+class FolderRow(Base):
+    """Persistent folder — allows empty folders to survive."""
+    __tablename__ = "folders"
+
+    name = Column(Text, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class ChatSessionRow(Base):
     """聊天会话"""
     __tablename__ = "chat_sessions"

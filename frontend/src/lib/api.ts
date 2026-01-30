@@ -304,3 +304,59 @@ export function deleteCollection(folderName: string) {
     `/api/collections/${encodeURIComponent(folderName)}`,
   );
 }
+
+// --- Chat ---
+
+export interface ChatMessageRequest {
+  message: string;
+  session_id?: string;
+  language?: string;
+}
+
+export interface ChatMessageResponse {
+  session_id: string;
+  reply: string;
+}
+
+export interface ChatSessionInfo {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatHistoryResponse {
+  sessions: ChatSessionInfo[];
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface SessionMessagesResponse {
+  session_id: string;
+  title: string | null;
+  messages: ChatMessage[];
+}
+
+export function sendChatMessage(
+  paperId: string,
+  body: ChatMessageRequest
+): Promise<ChatMessageResponse> {
+  return apiPost<ChatMessageResponse>(`/api/chat/${paperId}`, body);
+}
+
+export function getChatHistory(paperId: string): Promise<ChatHistoryResponse> {
+  return apiFetch<ChatHistoryResponse>(`/api/chat/${paperId}/history`);
+}
+
+export function getSessionMessages(
+  paperId: string,
+  sessionId: string
+): Promise<SessionMessagesResponse> {
+  return apiFetch<SessionMessagesResponse>(
+    `/api/chat/${paperId}/sessions/${sessionId}`
+  );
+}

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from src.model.paper import Paper
 from src.database.db.session import SessionLocal
-from src.database.db.models import PaperRow
+from src.database.db.models import PaperRow, FolderRow
 
 
 def _sanitize_for_jsonb(obj: Any) -> Any:
@@ -465,13 +465,16 @@ class PaperRepository:
 
     def get_all_folders(self) -> List[str]:
         """
-        Get all unique folder names across all papers.
+        Get all unique folder names (merged from papers + folders table).
         """
         with SessionLocal() as db:
-            rows = db.query(PaperRow).all()
+            # Folders persisted in folders table
+            folder_rows = db.query(FolderRow.name).all()
+            all_folders: set[str] = {r.name for r in folder_rows}
 
-            all_folders: set[str] = set()
-            for row in rows:
+            # Folders referenced inside paper JSONB
+            paper_rows = db.query(PaperRow).all()
+            for row in paper_rows:
                 folders = row.paper.get("favorite_folders") or []
                 all_folders.update(folders)
 
@@ -479,16 +482,18 @@ class PaperRepository:
 
     def get_folder_counts(self) -> dict[str, int]:
         """
-        Get paper count for each folder.
+        Get paper count for each folder (includes empty folders from folders table).
 
         Returns:
             Dict mapping folder_name -> count
         """
         with SessionLocal() as db:
-            rows = db.query(PaperRow).all()
+            # Start with empty-folder rows so they appear with count 0
+            folder_rows = db.query(FolderRow.name).all()
+            counts: dict[str, int] = {r.name: 0 for r in folder_rows}
 
-            counts: dict[str, int] = {}
-            for row in rows:
+            paper_rows = db.query(PaperRow).all()
+            for row in paper_rows:
                 folders = row.paper.get("favorite_folders") or []
                 for folder in folders:
                     counts[folder] = counts.get(folder, 0) + 1
@@ -497,7 +502,7 @@ class PaperRepository:
 
     def rename_folder(self, old_name: str, new_name: str) -> int:
         """
-        Rename a folder (batch update all related papers).
+        Rename a folder (batch update all related papers + folders table).
 
         Args:
             old_name: Current folder name
@@ -515,6 +520,13 @@ class PaperRepository:
             return 0
 
         with SessionLocal() as db:
+            # Rename in folders table
+            folder_row = db.get(FolderRow, old_name)
+            if folder_row:
+                db.delete(folder_row)
+                db.flush()
+                db.merge(FolderRow(name=new_name))
+
             # Find all papers with the old folder name
             rows = (
                 db.query(PaperRow)
@@ -528,7 +540,6 @@ class PaperRepository:
                 folders: List[str] = paper.get("favorite_folders") or []
 
                 if old_name in folders:
-                    # Replace old name with new name
                     idx = folders.index(old_name)
                     folders[idx] = new_name
                     paper["favorite_folders"] = folders
@@ -543,7 +554,7 @@ class PaperRepository:
 
     def delete_folder(self, folder_name: str) -> int:
         """
-        Delete a folder (remove from all papers).
+        Delete a folder (remove from all papers + folders table).
 
         Args:
             folder_name: Folder name to delete
@@ -552,6 +563,11 @@ class PaperRepository:
             Number of papers affected
         """
         with SessionLocal() as db:
+            # Remove from folders table
+            folder_row = db.get(FolderRow, folder_name)
+            if folder_row:
+                db.delete(folder_row)
+
             # Find all papers with this folder
             rows = (
                 db.query(PaperRow)
@@ -568,7 +584,6 @@ class PaperRepository:
                     folders.remove(folder_name)
                     paper["favorite_folders"] = folders
 
-                    # Clear favorited_at if no folders left
                     if not folders:
                         paper["favorited_at"] = None
 
@@ -583,20 +598,17 @@ class PaperRepository:
 
     def create_empty_folder(self, folder_name: str) -> bool:
         """
-        Create an empty folder placeholder.
-        
-        Note: Since folders are virtual (derived from papers),
-        we store empty folders in a special way - by adding
-        a marker. For simplicity, we just return True here
-        as folders are created when papers are added to them.
-        
-        Returns:
-            True (folder "created" - will appear when paper is added)
+        Persist an empty folder in the folders table (upsert).
+
+        Returns True if a new row was inserted, False if it already existed.
         """
-        # Folders are virtual - they exist when at least one paper has them
-        # For "empty" folders, we could store them in a separate config,
-        # but for now, just return True as a no-op
-        return True
+        with SessionLocal() as db:
+            existing = db.get(FolderRow, folder_name)
+            if existing:
+                return False
+            db.add(FolderRow(name=folder_name))
+            db.commit()
+            return True
 
     # =====================================================
     # Dislike
