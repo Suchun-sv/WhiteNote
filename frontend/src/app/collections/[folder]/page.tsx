@@ -1,54 +1,59 @@
 "use client";
 
 import { useState } from "react";
+import { use } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaperCard } from "@/components/paper-card";
 import { usePapers } from "@/hooks/use-papers";
 
-export default function Home() {
+interface FolderPageProps {
+  params: Promise<{ folder: string }>;
+}
+
+export default function FolderPage({ params }: FolderPageProps) {
+  const { folder } = use(params);
+  const folderName = decodeURIComponent(folder);
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error } = usePapers({ page, size: 20 });
+  const { data, isLoading, isError, error } = usePapers({
+    page,
+    size: 20,
+    folder: folderName,
+  });
 
   const pagination = data?.pagination;
   const papers = data?.data ?? [];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky header */}
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-6xl px-4 py-4">
-          <h1 className="text-2xl font-bold tracking-tight">WhiteNote</h1>
-          <p className="text-sm text-muted-foreground">
-            像刷小红书一样刷论文
-          </p>
-          <nav className="mt-2 flex gap-4">
-            <Link
-              href="/"
-              className="text-sm font-medium text-foreground border-b-2 border-foreground pb-0.5"
-            >
-              论文
+          <div className="flex items-center gap-3">
+            <Link href="/collections">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
             </Link>
-            <Link
-              href="/collections"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground pb-0.5"
-            >
-              收藏夹
-            </Link>
-          </nav>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">
+                {folderName}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {pagination ? `${pagination.total} 篇论文` : ""}
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6">
-        {/* Loading */}
         {isLoading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         )}
 
-        {/* Error */}
         {isError && (
           <div className="rounded-md border border-red-200 bg-red-50 p-4 text-left text-red-600">
             <div className="font-semibold mb-2">加载失败</div>
@@ -68,14 +73,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* Empty */}
         {!isLoading && !isError && papers.length === 0 && (
           <div className="py-20 text-center text-muted-foreground">
-            暂无论文
+            该收藏夹暂无论文
           </div>
         )}
 
-        {/* Paper grid */}
         {papers.length > 0 && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {papers.map((paper) => (
@@ -84,7 +87,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Pagination */}
         {pagination && pagination.total_pages > 1 && (
           <div className="mt-8 flex items-center justify-center gap-4">
             <Button
