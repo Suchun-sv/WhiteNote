@@ -113,42 +113,36 @@ export default function Home() {
           <p className="text-sm text-muted-foreground">
             像刷小红书一样刷论文
           </p>
-          <nav className="mt-2 flex items-center gap-4 overflow-x-auto">
-            {visibleFeeds.map((feed) => (
-              <button
-                key={feed.id}
-                onClick={() => handleFeedChange(feed.id)}
-                className={`text-sm font-medium pb-0.5 whitespace-nowrap ${
-                  activeFeed === feed.id
-                    ? "text-foreground border-b-2 border-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+          <nav className="mt-2 flex items-center gap-1 overflow-x-auto min-w-0">
+              {visibleFeeds.map((feed) => (
+                <button
+                  key={feed.id}
+                  onClick={() => handleFeedChange(feed.id)}
+                  className={`text-sm font-medium pb-0.5 whitespace-nowrap shrink-0 ${
+                    activeFeed === feed.id
+                      ? "text-foreground border-b-2 border-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {feed.name}
+                </button>
+              ))}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => setAddFeedOpen(true)}
+                title="Add feed"
               >
-                {feed.name}
-              </button>
-            ))}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
-              onClick={() => setAddFeedOpen(true)}
-              title="Add feed"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <AddFeedDialog
-              open={addFeedOpen}
-              onOpenChange={setAddFeedOpen}
-              feeds={feeds ?? []}
-              visibleFeedIds={visibleFeedIds}
-              onAdd={handleAddFeed}
-            />
-            <Link
-              href="/collections"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground pb-0.5 whitespace-nowrap"
-            >
-              收藏夹
-            </Link>
+                <Plus className="h-4 w-4" />
+              </Button>
+              <AddFeedDialog
+                open={addFeedOpen}
+                onOpenChange={setAddFeedOpen}
+                feeds={feeds ?? []}
+                visibleFeedIds={visibleFeedIds}
+                onAdd={handleAddFeed}
+              />
           </nav>
         </div>
       </header>

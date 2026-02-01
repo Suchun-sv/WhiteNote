@@ -21,6 +21,7 @@ class PaperRow(Base):
     paper = Column(JSONB, nullable=False)
 
     title = Column(Text)
+    feed = Column(Text, default="arxiv", index=True)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
 

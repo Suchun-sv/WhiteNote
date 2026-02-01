@@ -61,6 +61,33 @@ class RedisConfig(BaseModel):
     password: Annotated[Optional[str], Field(default=None)]
 
 
+class FeedConfig(BaseModel):
+    """Single feed definition."""
+    id: str
+    name: str
+    crawler: str = "arxiv"
+    schedule: Optional[str] = None   # cron expr or null for manual
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SemanticScholarConfig(BaseModel):
+    """Semantic Scholar API 配置（用于获取作者机构信息）"""
+    api_key: Annotated[Optional[str], Field(default=None)]
+    min_interval: Annotated[float, Field(default=0.5)]  # seconds between requests
+    retries: Annotated[int, Field(default=3)]
+    enabled: Annotated[bool, Field(default=True)]
+
+
+class MinioConfig(BaseModel):
+    """MinIO 配置（用于对象存储）"""
+    endpoint: Annotated[str, Field(default="localhost:9002")]
+    access_key: Annotated[str, Field(default="minioadmin")]
+    secret_key: Annotated[str, Field(default="minioadmin")]
+    secure: Annotated[bool, Field(default=False)]
+    pdf_bucket: Annotated[str, Field(default="whitenote-pdfs")]
+    comic_bucket: Annotated[str, Field(default="whitenote-comics")]
+
+
 class Settings(BaseSettings):
     language: Annotated[str, Field(default="en")]
     source_list: Annotated[List[str], Field(default=["arXiv"])]
@@ -85,6 +112,11 @@ class Settings(BaseSettings):
     favorite: FavoriteConfig = Field(default_factory=FavoriteConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
+    minio: MinioConfig = Field(default_factory=MinioConfig)
+    semantic_scholar: SemanticScholarConfig = Field(default_factory=SemanticScholarConfig)
+    feeds: List[FeedConfig] = Field(default_factory=lambda: [
+        FeedConfig(id="arxiv", name="arXiv", crawler="arxiv", schedule="0 */10 * * *", params={}),
+    ])
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps import get_paper_repo
 from api.schemas.paper import (
+    BulkDislikeRequest,
     PaginationMeta,
     PaperCardResponse,
     PaperDetailResponse,
@@ -23,6 +24,7 @@ def list_papers(
     sort_by: str = Query(default="created_at"),
     order: str = Query(default="desc"),
     folder: Optional[str] = Query(default=None),
+    feed: Optional[str] = Query(default=None),
     repo: PaperRepository = Depends(get_paper_repo),
 ):
     """List papers with pagination."""
@@ -34,11 +36,14 @@ def list_papers(
         include_disliked=False,
         include_favorite=bool(folder),
         folder_filter=folder,
+        feed=feed,
     )
 
     total = repo.count_with_filters(
         include_disliked=False,
+        include_favorite=bool(folder),
         folder_filter=folder,
+        feed=feed,
     )
 
     # Application-level keyword filter (M1 limitation)
@@ -102,6 +107,16 @@ def remove_favorite(
 
 
 # --- Dislike ---
+
+@router.post("/bulk-dislike")
+def bulk_dislike(
+    body: BulkDislikeRequest,
+    repo: PaperRepository = Depends(get_paper_repo),
+):
+    """Bulk mark papers as disliked."""
+    count = repo.bulk_mark_disliked(body.paper_ids)
+    return {"success": True, "affected_count": count}
+
 
 @router.post("/{paper_id}/dislike")
 def mark_dislike(

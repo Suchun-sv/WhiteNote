@@ -11,7 +11,8 @@ class Paper(BaseModel):
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
- 
+    feed: str = "arxiv"
+
     title: str
     abstract: str
     authors: List[str] = Field(default_factory=list)
@@ -45,6 +46,9 @@ class Paper(BaseModel):
 
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+    # Author affiliations (from Semantic Scholar)
+    affiliations: Optional[List[str]] = None
 
     arxiv_entry_id: Optional[str] = None
     arxiv_updated: Optional[datetime] = None

@@ -4,7 +4,7 @@ import math
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.model.paper import Paper
 
@@ -24,6 +24,11 @@ class PaperCardResponse(BaseModel):
     arxiv_published: Optional[datetime] = None
     favorite_folders: List[str] = []
     is_disliked: bool = False
+    affiliations: Optional[List[str]] = None
+    keywords: List[str] = Field(default_factory=list)
+    pdf_url: Optional[str] = None
+    arxiv_journal_ref: Optional[str] = None
+    feed: str = "arxiv"
 
     @classmethod
     def from_paper(cls, paper: Paper) -> PaperCardResponse:
@@ -40,7 +45,18 @@ class PaperCardResponse(BaseModel):
             arxiv_published=paper.arxiv_published,
             favorite_folders=paper.favorite_folders or [],
             is_disliked=paper.is_disliked or False,
+            affiliations=paper.affiliations,
+            keywords=paper.keywords or [],
+            pdf_url=paper.pdf_url,
+            arxiv_journal_ref=paper.arxiv_journal_ref,
+            feed=paper.feed,
         )
+
+
+# --- Bulk dislike ---
+
+class BulkDislikeRequest(BaseModel):
+    paper_ids: List[str]
 
 
 # --- Detail (single paper) ---
@@ -75,6 +91,9 @@ class PaperDetailResponse(BaseModel):
     # Timestamps
     created_at: str
     updated_at: str
+
+    # Affiliations
+    affiliations: Optional[List[str]] = None
 
     # arXiv metadata
     arxiv_entry_id: Optional[str] = None

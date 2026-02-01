@@ -40,7 +40,27 @@ services:
       timeout: 5s
       retries: 3
 
+  minio:
+    image: minio/minio:latest
+    container_name: whitenote-minio
+    restart: unless-stopped
+    ports:
+      - "9002:9000"   # API (host 9002 -> container 9000)
+      - "9001:9001"   # Console
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   postgres_data:
   qdrant_data:
   redis_data:
+  minio_data:

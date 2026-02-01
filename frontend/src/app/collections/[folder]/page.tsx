@@ -7,6 +7,8 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaperCard } from "@/components/paper-card";
 import { usePapers } from "@/hooks/use-papers";
+import { DevDebugPanel } from "@/components/dev-debug-panel";
+import { MasonryGrid } from "@/components/masonry-grid";
 
 interface FolderPageProps {
   params: Promise<{ folder: string }>;
@@ -29,7 +31,7 @@ export default function FolderPage({ params }: FolderPageProps) {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center gap-3">
+          <div className="mt-2 flex items-center gap-3">
             <Link href="/collections">
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <ArrowLeft className="h-4 w-4" />
@@ -60,16 +62,7 @@ export default function FolderPage({ params }: FolderPageProps) {
             <div className="text-sm whitespace-pre-line">
               {error instanceof Error ? error.message : "未知错误"}
             </div>
-            {process.env.NODE_ENV === "development" && error instanceof Error && (
-              <details className="mt-2 text-xs">
-                <summary className="cursor-pointer text-red-500 hover:text-red-700">
-                  查看调试信息
-                </summary>
-                <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-                  {error.stack || error.message}
-                </pre>
-              </details>
-            )}
+            {error instanceof Error && <DevDebugPanel error={error} />}
           </div>
         )}
 
@@ -80,11 +73,11 @@ export default function FolderPage({ params }: FolderPageProps) {
         )}
 
         {papers.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <MasonryGrid>
             {papers.map((paper) => (
               <PaperCard key={paper.id} paper={paper} />
             ))}
-          </div>
+          </MasonryGrid>
         )}
 
         {pagination && pagination.total_pages > 1 && (

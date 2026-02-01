@@ -16,10 +16,12 @@
     "@tanstack/react-query": "^5.90.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "katex": "^0.16.28",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-masonry-css": "^1.0.16",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

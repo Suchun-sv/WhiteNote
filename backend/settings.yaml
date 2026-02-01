@@ -25,13 +25,32 @@ scheduler:
   timezone: "Asia/Shanghai"
   daily_arxiv_job: "0 */10 * * *"
 
-source_list: 
+source_list:
   - arXiv
 
 keywords:
   - "vector database"
   - "RAG"
   - "agent"
+
+# Feed definitions — each feed is a tab in the frontend
+feeds:
+  - id: arxiv
+    name: arXiv
+    crawler: arxiv
+    schedule: "0 */10 * * *"
+    params:
+      keywords:
+        - "vector database"
+        - "RAG"
+        - "agent"
+  - id: iclr-2026
+    name: ICLR 2026
+    crawler: openreview
+    schedule: null
+    params:
+      venue: "ICLR.cc/2026/Conference"
+      status: "accepted"
 
 paper_save_path: "cache/papers.json"
 
@@ -55,3 +74,19 @@ redis:
   port: 6379
   db: 0
   password: null
+
+# Semantic Scholar (author affiliations)
+semantic_scholar:
+  api_key: null            # optional: S2 API key for higher rate limits
+  min_interval: 1.5        # seconds between API requests
+  retries: 3
+  enabled: true
+
+# MinIO (object storage for PDFs and comics)
+minio:
+  endpoint: "localhost:9002"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  secure: false
+  pdf_bucket: "whitenote-pdfs"
+  comic_bucket: "whitenote-comics"

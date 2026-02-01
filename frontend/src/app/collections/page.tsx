@@ -26,6 +26,7 @@ import {
   useRenameCollection,
   useDeleteCollection,
 } from "@/hooks/use-collections";
+import { DevDebugPanel } from "@/components/dev-debug-panel";
 
 export default function CollectionsPage() {
   const { data, isLoading, isError, error } = useCollections();
@@ -84,20 +85,6 @@ export default function CollectionsPage() {
           <p className="text-sm text-muted-foreground">
             像刷小红书一样刷论文
           </p>
-          <nav className="mt-2 flex gap-4">
-            <Link
-              href="/"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground pb-0.5"
-            >
-              论文
-            </Link>
-            <Link
-              href="/collections"
-              className="text-sm font-medium text-foreground border-b-2 border-foreground pb-0.5"
-            >
-              收藏夹
-            </Link>
-          </nav>
         </div>
       </header>
 
@@ -122,16 +109,7 @@ export default function CollectionsPage() {
             <div className="text-sm whitespace-pre-line">
               {error instanceof Error ? error.message : "未知错误"}
             </div>
-            {process.env.NODE_ENV === "development" && error instanceof Error && (
-              <details className="mt-2 text-xs">
-                <summary className="cursor-pointer text-red-500 hover:text-red-700">
-                  查看调试信息
-                </summary>
-                <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto">
-                  {error.stack || error.message}
-                </pre>
-              </details>
-            )}
+            {error instanceof Error && <DevDebugPanel error={error} />}
           </div>
         )}
 

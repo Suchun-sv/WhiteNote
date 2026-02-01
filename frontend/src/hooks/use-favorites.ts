@@ -4,6 +4,7 @@ import {
   removeFavorite,
   markDislike,
   unmarkDislike,
+  bulkDislike,
   type PaperListResponse,
 } from "@/lib/api";
 
@@ -63,7 +64,9 @@ export function useToggleFavorite() {
     },
 
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["papers"] });
+      // Only invalidate collections (folder counts may change).
+      // Do NOT invalidate papers — the card must stay in place.
+      // Papers cache is refreshed when the user clicks "下一批".
       qc.invalidateQueries({ queryKey: ["collections"] });
     },
   });
@@ -133,6 +136,16 @@ export function useToggleDislike() {
       }
     },
 
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["papers"] });
+    },
+  });
+}
+
+export function useBulkDislike() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paperIds: string[]) => bulkDislike(paperIds),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["papers"] });
     },

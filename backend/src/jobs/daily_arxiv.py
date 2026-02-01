@@ -11,7 +11,8 @@ It is safe to be called by:
 """
 
 import asyncio
-import arxiv
+import re
+
 from tqdm import tqdm
 
 import logging
@@ -22,7 +23,6 @@ from pathlib import Path
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
-from src.crawler.arxiv_client import ArxivClient
 from src.database.paper_repository import PaperRepository
 from src.service.llm_service import (
     init_litellm,
@@ -30,6 +30,8 @@ from src.service.llm_service import (
     translate_title,
 )
 from src.config import Config
+from src.service.semantic_scholar_service import SemanticScholarClient
+from src.jobs.feed_job import run_feed_job
 
 
 
@@ -75,56 +77,49 @@ def run_daily_arxiv_job() -> None:
 async def _run():
     setup_logging()
     logger = logging.getLogger(__name__)
-    logger.info("🌿 LavenderSentinel — Daily ArXiv Job started")
+    logger.info("Daily ArXiv Job started")
 
     # --- Init ---
     init_litellm()
-    crawler = ArxivClient()
     repo = PaperRepository()
 
-    keywords = Config.keywords
-
-    logger.info("🔎 Fetching new papers from arXiv...")
-
-    keyword_results = crawler.search_papers(
-        keywords=keywords,
-        sort_by=arxiv.SortCriterion.SubmittedDate,
-    )
-
-    total_inserted = 0
-
-    for kw, papers in keyword_results.items():
-        inserted = repo.insert_new_papers(papers)
-        total_inserted += len(inserted)
-        logger.info(f"📌 keyword='{kw}' fetched={len(papers)} inserted={len(inserted)}")
-
-    logger.info(f"📚 Total new papers inserted: {total_inserted}")
+    # --- Fetch papers via feed_job ---
+    # Run all feeds that use scheduled crawlers
+    for feed_config in Config.feeds:
+        if feed_config.schedule:
+            try:
+                count = run_feed_job(feed_config.id)
+                logger.info(f"Feed '{feed_config.id}': {count} new papers inserted")
+            except NotImplementedError as e:
+                logger.warning(f"Feed '{feed_config.id}' skipped: {e}")
+            except Exception as e:
+                logger.error(f"Feed '{feed_config.id}' failed: {e}")
 
     # ---------- AI title ----------
     if Config.auto_ai_title:
-        logger.info("🤖 Generating AI titles...")
+        logger.info("Generating AI titles...")
 
         papers = repo.list_missing_ai_title(limit=-1)
-        logger.info(f"🔍 Total papers to process for AI title: {len(papers)}")
+        logger.info(f"Total papers to process for AI title: {len(papers)}")
 
         for paper in tqdm(papers, desc="Generating AI titles"):
             try:
                 translated = translate_title(paper.title)
-                logger.info(f"🔍 AI title translated: {translated}")
+                logger.info(f"AI title translated: {translated}")
                 repo.update_ai_title(
                     paper_id=paper.id,
                     ai_title=translated,
                     provider=Config.chat_litellm.model,
                 )
             except Exception as e:
-                logger.error(f"❌ AI title failed: {paper.id} ({e})")
+                logger.error(f"AI title failed: {paper.id} ({e})")
 
     # ---------- AI abstract ----------
     if Config.auto_ai_abstract:
-        logger.info("🤖 Generating AI abstracts...")
+        logger.info("Generating AI abstracts...")
 
         papers = repo.list_missing_ai_abstract(limit=-1)
-        logger.info(f"🔍 Total papers to process for AI abstract: {len(papers)}")
+        logger.info(f"Total papers to process for AI abstract: {len(papers)}")
 
         for paper in tqdm(papers, desc="Generating AI abstracts"):
             try:
@@ -135,9 +130,39 @@ async def _run():
                     provider=Config.chat_litellm.model,
                 )
             except Exception as e:
-                logger.error(f"❌ AI abstract failed: {paper.id} ({e})")
+                logger.error(f"AI abstract failed: {paper.id} ({e})")
 
-    logger.info("🎉 Daily ArXiv job finished")
+    # ---------- Affiliations (Semantic Scholar) ----------
+    if Config.semantic_scholar.enabled:
+        logger.info("Fetching author affiliations from Semantic Scholar...")
+
+        s2_client = SemanticScholarClient()
+        papers = repo.list_missing_affiliations(limit=-1)
+        logger.info(f"Total papers to process for affiliations: {len(papers)}")
+
+        for paper in tqdm(papers, desc="Fetching affiliations"):
+            try:
+                # Extract arXiv ID from arxiv_entry_id or paper.id
+                arxiv_id = None
+                if paper.arxiv_entry_id:
+                    match = re.search(r"(\d{4}\.\d{4,5})", paper.arxiv_entry_id)
+                    if match:
+                        arxiv_id = match.group(1)
+                if not arxiv_id and paper.id and re.match(r"^\d{4}\.\d{4,5}$", paper.id):
+                    arxiv_id = paper.id
+
+                if not arxiv_id:
+                    logger.debug(f"Skipping paper {paper.id}: no arXiv ID found")
+                    # Write empty list so we don't retry
+                    repo.update_affiliations(paper.id, [])
+                    continue
+
+                affiliations = s2_client.fetch_affiliations(arxiv_id)
+                repo.update_affiliations(paper.id, affiliations or [])
+            except Exception as e:
+                logger.error(f"Affiliation fetch failed: {paper.id} ({e})")
+
+    logger.info("Daily ArXiv job finished")
 
 if __name__ == "__main__":
     run_daily_arxiv_job()

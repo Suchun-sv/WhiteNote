@@ -1,3 +1,4 @@
+import io
 import re
 from pypdf import PdfReader
 
@@ -29,5 +30,14 @@ def extract_pdf_markdown(pdf_path: str) -> str:
     从 PDF 提取文本并清理不安全字符。
     """
     reader = PdfReader(pdf_path)
+    raw_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+    return sanitize_text_for_postgres(raw_text)
+
+
+def extract_pdf_markdown_from_bytes(pdf_bytes: bytes) -> str:
+    """
+    从 PDF 字节流提取文本并清理不安全字符。
+    """
+    reader = PdfReader(io.BytesIO(pdf_bytes))
     raw_text = "\n".join([page.extract_text() or "" for page in reader.pages])
     return sanitize_text_for_postgres(raw_text)

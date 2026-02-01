@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Heart, ExternalLink, ThumbsDown } from "lucide-react";
+import { Heart, ChevronDown, ChevronUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FolderPicker } from "@/components/folder-picker";
-import { useToggleFavorite, useToggleDislike } from "@/hooks/use-favorites";
+import { MathText } from "@/components/math-text";
+import { useToggleFavorite } from "@/hooks/use-favorites";
 import type { PaperCard as PaperCardData } from "@/lib/api";
 
 const DEFAULT_FOLDER = "我的收藏";
@@ -21,11 +23,6 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-function formatAuthors(authors: string[]): string {
-  if (authors.length <= 3) return authors.join(", ");
-  return `${authors.slice(0, 3).join(", ")} +${authors.length - 3} more`;
-}
-
 interface PaperCardProps {
   paper: PaperCardData;
 }
@@ -34,9 +31,17 @@ export function PaperCard({ paper }: PaperCardProps) {
   const displayTitle = paper.ai_title || paper.title;
   const displayAbstract = paper.ai_abstract || paper.abstract;
   const isFavorited = paper.favorite_folders.length > 0;
-  const isDisliked = paper.is_disliked || false;
   const toggleFavorite = useToggleFavorite();
-  const toggleDislike = useToggleDislike();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
+  const abstractRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = abstractRef.current;
+    if (el) {
+      setIsTruncated(el.scrollHeight > el.clientHeight + 1);
+    }
+  }, [displayAbstract]);
 
   function handleHeartClick(e: React.MouseEvent) {
     e.stopPropagation();
@@ -47,34 +52,25 @@ export function PaperCard({ paper }: PaperCardProps) {
     });
   }
 
-  function handleDislikeClick(e: React.MouseEvent) {
-    e.stopPropagation();
-    toggleDislike.mutate({
-      paperId: paper.id,
-      action: isDisliked ? "undislike" : "dislike",
-    });
-  }
-
   return (
-    <Card className="transition-shadow hover:shadow-md">
-      <CardHeader className="pb-3">
+    <Card
+      className={`transition-all duration-200 hover:shadow-md ${
+        isFavorited
+          ? "ring-1 ring-red-200 bg-red-50/30 dark:ring-red-900/40 dark:bg-red-950/10"
+          : ""
+      }`}
+    >
+      <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <Link
             href={`/paper/${paper.id}`}
             className="flex-1 min-w-0 group"
           >
-            <CardTitle className="text-base font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors cursor-pointer">
+            <CardTitle className="text-base font-semibold leading-snug line-clamp-2 group-hover:text-primary group-hover:underline transition-colors cursor-pointer">
               {displayTitle}
             </CardTitle>
           </Link>
           <div className="flex shrink-0 items-center gap-1">
-            <Link
-              href={`/paper/${paper.id}`}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="查看详情"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -96,35 +92,46 @@ export function PaperCard({ paper }: PaperCardProps) {
             />
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {formatAuthors(paper.authors)}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground line-clamp-3">
-          {displayAbstract}
-        </p>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-1">
-            {paper.arxiv_primary_category && (
-              <Badge variant="secondary">{paper.arxiv_primary_category}</Badge>
-            )}
-          </div>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatDate(paper.arxiv_published)}
-          </span>
+        <div className="flex flex-wrap items-center gap-1 pt-1">
+          {paper.feed && (
+            <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+              {paper.feed}
+            </Badge>
+          )}
+          {paper.keywords.map((kw) => (
+            <Badge key={kw} variant="secondary" className="text-[10px]">
+              {kw}
+            </Badge>
+          ))}
         </div>
-        {/* 不喜欢按钮 - 设计得大一点好按 */}
-        <Button
-          variant={isDisliked ? "destructive" : "outline"}
-          size="lg"
-          className="w-full mt-3 h-12 text-base font-medium"
-          onClick={handleDislikeClick}
-          disabled={toggleDislike.isPending}
-        >
-          <ThumbsDown className="h-5 w-5 mr-2" />
-          {isDisliked ? "已标记为不感兴趣" : "不感兴趣"}
-        </Button>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div>
+          <div
+            ref={abstractRef}
+            className={`text-sm text-muted-foreground ${
+              isExpanded ? "" : "line-clamp-2"
+            } ${isTruncated || isExpanded ? "cursor-pointer" : ""}`}
+            onClick={isTruncated || isExpanded ? () => setIsExpanded(!isExpanded) : undefined}
+          >
+            <MathText text={displayAbstract} />
+          </div>
+          {(isTruncated || isExpanded) && (
+            <button
+              className="text-xs text-primary/70 hover:text-primary flex items-center gap-0.5 mt-1 active:opacity-70"
+              onClick={() => setIsExpanded(!isExpanded)}
+            >
+              {isExpanded ? (
+                <>收起 <ChevronUp className="h-3 w-3" /></>
+              ) : (
+                <>展开摘要 <ChevronDown className="h-3 w-3" /></>
+              )}
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {formatDate(paper.arxiv_published)}
+        </div>
       </CardContent>
     </Card>
   );

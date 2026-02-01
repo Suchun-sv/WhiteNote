@@ -9,13 +9,13 @@ Paper Summary Job - 单篇论文 AI 总结后台任务
 """
 
 import logging
-from pathlib import Path
 from typing import Optional
 
 from src.database.paper_repository import PaperRepository
 from src.service.llm_service import init_litellm, summarize_long_markdown
-from src.service.pdf_parser_service import extract_pdf_markdown
+from src.service.pdf_parser_service import extract_pdf_markdown_from_bytes
 from src.service.pdf_download_service import PdfDownloader
+from src.service.storage_service import get_storage
 from src.config import Config
 
 logger = logging.getLogger(__name__)
@@ -53,9 +53,9 @@ def run_paper_summary_job(paper_id: str) -> None:
         repo.update_summary_job_status(paper_id, SummaryJobStatus.RUNNING)
 
         # --- Step 1: 确保 PDF 存在 ---
-        pdf_path = Path(Config.pdf_save_path) / f"{paper_id}.pdf"
+        storage = get_storage()
 
-        if not pdf_path.exists():
+        if not storage.pdf_exists(paper_id):
             logger.info(f"📥 Downloading PDF for {paper_id}...")
             downloader = PdfDownloader()
             downloader.download_one(
@@ -63,12 +63,13 @@ def run_paper_summary_job(paper_id: str) -> None:
                 paper_id,
             )
 
-        if not pdf_path.exists():
+        if not storage.pdf_exists(paper_id):
             raise FileNotFoundError(f"Failed to download PDF: {paper_id}")
 
         # --- Step 2: 解析 PDF ---
         logger.info(f"📄 Extracting markdown from PDF...")
-        md_text = extract_pdf_markdown(pdf_path)
+        pdf_bytes = storage.get_pdf(paper_id)
+        md_text = extract_pdf_markdown_from_bytes(pdf_bytes)
 
         # 保存全文
         repo.update_full_text(paper_id, md_text)

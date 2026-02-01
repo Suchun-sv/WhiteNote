@@ -55,8 +55,9 @@ class PaperRepository:
             
             row = PaperRow(
                 id=paper.id,
-                paper=paper_data,  
+                paper=paper_data,
                 title=paper.title,
+                feed=paper.feed,
                 created_at=paper.created_at,
                 updated_at=datetime.utcnow(),
                 arxiv_entry_id=paper.arxiv_entry_id,
@@ -117,6 +118,7 @@ class PaperRepository:
                     id=p.id,
                     paper=p.model_dump(mode="json"),
                     title=p.title,
+                    feed=p.feed,
                     created_at=p.created_at,
                     updated_at=p.updated_at,
                     arxiv_entry_id=p.arxiv_entry_id,
@@ -262,6 +264,42 @@ class PaperRepository:
             paper["updated_at"] = datetime.utcnow().isoformat()
 
             row.paper = paper         # ⭐ 整体赋值（SQLAlchemy 能识别）
+            row.updated_at = datetime.utcnow()
+
+            db.commit()
+
+    def list_missing_affiliations(self, limit: int = -1) -> List[Paper]:
+        """
+        List papers where affiliations is null (not yet fetched from Semantic Scholar).
+        Newest first so the home page gets data sooner.
+        """
+        with SessionLocal() as db:
+            query = (
+                db.query(PaperRow)
+                .filter(PaperRow.paper.op("->>")("affiliations").is_(None))
+                .order_by(PaperRow.created_at.desc())
+            )
+
+            if limit > 0:
+                query = query.limit(limit)
+
+            rows = query.all()
+            return [Paper.model_validate(r.paper) for r in rows]
+
+    def update_affiliations(self, paper_id: str, affiliations: List[str]) -> None:
+        """
+        Write affiliations list into the Paper JSONB.
+        """
+        with SessionLocal() as db:
+            row = db.get(PaperRow, paper_id)
+            if not row:
+                return
+
+            paper = dict(row.paper)
+            paper["affiliations"] = _sanitize_for_jsonb(affiliations)
+            paper["updated_at"] = datetime.utcnow().isoformat()
+
+            row.paper = paper
             row.updated_at = datetime.utcnow()
 
             db.commit()
@@ -633,6 +671,31 @@ class PaperRepository:
 
             db.commit()
 
+    def bulk_mark_disliked(self, paper_ids: list[str]) -> int:
+        """
+        Mark multiple papers as disliked in a single transaction.
+        Returns the number of papers actually updated.
+        """
+        if not paper_ids:
+            return 0
+
+        now = datetime.utcnow()
+        count = 0
+        with SessionLocal() as db:
+            rows = db.query(PaperRow).filter(PaperRow.id.in_(paper_ids)).all()
+            for row in rows:
+                paper = dict(row.paper)
+                if paper.get("is_disliked"):
+                    continue
+                paper["is_disliked"] = True
+                paper["disliked_at"] = now.isoformat()
+                paper["updated_at"] = now.isoformat()
+                row.paper = paper
+                row.updated_at = now
+                count += 1
+            db.commit()
+        return count
+
     def unmark_disliked(self, paper_id: str) -> None:
         """
         Remove dislike mark from a paper.
@@ -661,6 +724,7 @@ class PaperRepository:
         include_disliked: bool = False,
         include_favorite: bool = False,
         folder_filter: Optional[str] = None,
+        feed: Optional[str] = None,
     ) -> List[Paper]:
         """
         List papers with filters for disliked and folder.
@@ -673,9 +737,14 @@ class PaperRepository:
             include_disliked: If False, exclude disliked papers
             include_favorite: If False, exclude favorite papers
             folder_filter: If set, only return papers in this folder
+            feed: If set, only return papers from this feed
         """
         with SessionLocal() as db:
             query = db.query(PaperRow)
+
+            # Filter by feed
+            if feed:
+                query = query.filter(PaperRow.feed == feed)
 
             # Filter out disliked papers by default
             if not include_disliked:
@@ -722,13 +791,19 @@ class PaperRepository:
     def count_with_filters(
         self,
         include_disliked: bool = False,
+        include_favorite: bool = False,
         folder_filter: Optional[str] = None,
+        feed: Optional[str] = None,
     ) -> int:
         """
         Count papers with filters (for pagination).
+        Must mirror the same filter logic as list_with_filters.
         """
         with SessionLocal() as db:
             query = db.query(PaperRow)
+
+            if feed:
+                query = query.filter(PaperRow.feed == feed)
 
             if not include_disliked:
                 query = query.filter(
@@ -741,6 +816,13 @@ class PaperRepository:
             if folder_filter:
                 query = query.filter(
                     PaperRow.paper["favorite_folders"].contains([folder_filter])
+                )
+            elif not include_favorite:
+                query = query.filter(
+                    or_(
+                        PaperRow.paper["favorite_folders"].is_(None),
+                        PaperRow.paper["favorite_folders"].astext == "[]",
+                    )
                 )
 
             return query.count()

@@ -115,6 +115,22 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Masonry grid (react-masonry-css) */
+.masonry-grid {
+  display: flex;
+  margin-left: -16px; /* gutter offset */
+  width: auto;
+}
+
+.masonry-grid-column {
+  padding-left: 16px; /* gutter */
+  background-clip: padding-box;
+}
+
+.masonry-grid-column > * {
+  margin-bottom: 16px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
