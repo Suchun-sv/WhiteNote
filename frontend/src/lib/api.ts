@@ -13,6 +13,11 @@ export interface PaperCard {
   arxiv_published: string | null;
   favorite_folders: string[];
   is_disliked: boolean;
+  affiliations: string[] | null;
+  keywords: string[];
+  pdf_url: string | null;
+  arxiv_journal_ref: string | null;
+  feed: string;
 }
 
 export interface PaperDetail {
@@ -45,6 +50,7 @@ export interface PaperDetail {
   arxiv_primary_category: string | null;
   arxiv_categories: string[] | null;
   arxiv_links: string[] | null;
+  affiliations: string[] | null;
 }
 
 export interface PaginationMeta {
@@ -76,19 +82,48 @@ export interface CollectionMutationResponse {
 
 // --- API client ---
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { getApiBase } from "./api-config";
+
+// 获取 API_BASE，避免 hydration 错误
+// 策略：在客户端始终使用基于 hostname 的动态获取，服务器端使用默认值
+function getCachedApiBase(): string {
+  // 优先使用环境变量（服务器和客户端都一致，不会导致 hydration 错误）
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // 在客户端，始终使用动态获取（基于当前 hostname）
+  // 这样前端运行在 suchun-mini:3000 时，API 地址会是 suchun-mini:8000
+  if (typeof window !== "undefined") {
+    const apiBase = getApiBase();
+    // 开发环境下记录获取到的 API 地址
+    if (process.env.NODE_ENV === "development") {
+      console.log("[API] Client API_BASE:", apiBase, "from hostname:", window.location.hostname);
+    }
+    return apiBase;
+  }
+  
+  // 服务器端：返回 localhost（仅用于 SSR，不会影响客户端请求）
+  return "http://localhost:8000";
+}
 
 async function apiFetch<T>(path: string): Promise<T> {
+  const API_BASE = getCachedApiBase();
   const url = `${API_BASE}${path}`;
   
   // 开发环境下记录请求信息
   if (process.env.NODE_ENV === "development") {
     console.log("[API] Fetching:", url);
     console.log("[API] API_BASE:", API_BASE);
+    console.log("[API] Frontend origin:", typeof window !== 'undefined' ? window.location.origin : 'SSR');
   }
   
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      // 添加更多选项以确保请求成功
+      mode: 'cors',
+      credentials: 'omit', // 避免 credentials 相关的 CORS 问题
+    });
     
     // 开发环境下记录响应信息
     if (process.env.NODE_ENV === "development") {
@@ -134,23 +169,38 @@ async function apiFetch<T>(path: string): Promise<T> {
       );
     }
   } catch (error) {
-    // 捕获网络错误（如 Failed to fetch）
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      const detailedError = new Error(
-        `无法连接到后端服务 (${API_BASE})。请检查：\n` +
-        `1. 后端服务是否正在运行？\n` +
-        `2. API URL 是否正确？当前: ${API_BASE}\n` +
-        `3. 是否存在 CORS 问题？（后端需要允许 ${typeof window !== 'undefined' ? window.location.origin : '前端来源'}）\n` +
-        `请求 URL: ${url}`
-      );
-      console.error("[API] Network error:", {
-        url,
-        apiBase: API_BASE,
-        frontendOrigin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
-        error: error.message,
-        suggestion: "检查后端服务是否运行，以及 CORS 配置是否正确"
-      });
-      throw detailedError;
+    // 捕获各种网络错误
+    if (error instanceof TypeError) {
+      const errorMsg = error.message.toLowerCase();
+      // 捕获常见的网络错误消息
+      if (
+        errorMsg.includes("failed to fetch") ||
+        errorMsg.includes("load failed") ||
+        errorMsg.includes("networkerror") ||
+        errorMsg.includes("network request failed")
+      ) {
+        const API_BASE = getCachedApiBase();
+        const frontendOrigin = typeof window !== 'undefined' ? window.location.origin : 'unknown';
+        const detailedError = new Error(
+          `无法连接到后端服务 (${API_BASE})。请检查：\n` +
+          `1. 后端服务是否正在运行？\n` +
+          `   运行命令: uvicorn main:app --host 0.0.0.0 --port 8000\n` +
+          `2. API URL 是否正确？当前: ${API_BASE}\n` +
+          `3. 是否存在 CORS 问题？（后端需要允许 ${frontendOrigin}）\n` +
+          `4. 防火墙是否阻止了连接？\n` +
+          `请求 URL: ${url}\n` +
+          `前端来源: ${frontendOrigin}`
+        );
+        console.error("[API] Network error:", {
+          url,
+          apiBase: API_BASE,
+          frontendOrigin,
+          errorType: error.constructor.name,
+          errorMessage: error.message,
+          suggestion: "检查后端服务是否运行，以及 CORS 配置是否正确"
+        });
+        throw detailedError;
+      }
     }
     // 重新抛出其他错误
     console.error("[API] Request error:", url, error);
@@ -159,6 +209,7 @@ async function apiFetch<T>(path: string): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  const API_BASE = getCachedApiBase();
   const url = `${API_BASE}${path}`;
   
   if (process.env.NODE_ENV === "development") {
@@ -179,12 +230,21 @@ async function apiPost<T>(path: string, body?: unknown): Promise<T> {
     }
     return res.json() as Promise<T>;
   } catch (error) {
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      const detailedError = new Error(
-        `无法连接到后端服务 (${API_BASE})。请求 URL: ${url}`
-      );
-      console.error("[API] Network error:", { url, apiBase: API_BASE, error: error.message });
-      throw detailedError;
+    if (error instanceof TypeError) {
+      const errorMsg = error.message.toLowerCase();
+      if (
+        errorMsg.includes("failed to fetch") ||
+        errorMsg.includes("load failed") ||
+        errorMsg.includes("networkerror") ||
+        errorMsg.includes("network request failed")
+      ) {
+        const API_BASE = getCachedApiBase();
+        const detailedError = new Error(
+          `无法连接到后端服务 (${API_BASE})。请求 URL: ${url}`
+        );
+        console.error("[API] Network error:", { url, apiBase: API_BASE, error: error.message });
+        throw detailedError;
+      }
     }
     console.error("[API] POST error:", url, error);
     throw error;
@@ -192,6 +252,7 @@ async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const API_BASE = getCachedApiBase();
   const url = `${API_BASE}${path}`;
   
   try {
@@ -206,14 +267,24 @@ async function apiPut<T>(path: string, body?: unknown): Promise<T> {
     }
     return res.json() as Promise<T>;
   } catch (error) {
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      throw new Error(`无法连接到后端服务 (${API_BASE})。请求 URL: ${url}`);
+    if (error instanceof TypeError) {
+      const errorMsg = error.message.toLowerCase();
+      if (
+        errorMsg.includes("failed to fetch") ||
+        errorMsg.includes("load failed") ||
+        errorMsg.includes("networkerror") ||
+        errorMsg.includes("network request failed")
+      ) {
+        const API_BASE = getCachedApiBase();
+        throw new Error(`无法连接到后端服务 (${API_BASE})。请求 URL: ${url}`);
+      }
     }
     throw error;
   }
 }
 
 async function apiDelete<T>(path: string): Promise<T> {
+  const API_BASE = getCachedApiBase();
   const url = `${API_BASE}${path}`;
   
   try {
@@ -224,11 +295,33 @@ async function apiDelete<T>(path: string): Promise<T> {
     }
     return res.json() as Promise<T>;
   } catch (error) {
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      throw new Error(`无法连接到后端服务 (${API_BASE})。请求 URL: ${url}`);
+    if (error instanceof TypeError) {
+      const errorMsg = error.message.toLowerCase();
+      if (
+        errorMsg.includes("failed to fetch") ||
+        errorMsg.includes("load failed") ||
+        errorMsg.includes("networkerror") ||
+        errorMsg.includes("network request failed")
+      ) {
+        const API_BASE = getCachedApiBase();
+        throw new Error(`无法连接到后端服务 (${API_BASE})。请求 URL: ${url}`);
+      }
     }
     throw error;
   }
+}
+
+// --- Feeds ---
+
+export interface FeedInfo {
+  id: string;
+  name: string;
+  crawler?: string;
+  year?: number | null;
+}
+
+export function fetchFeeds(): Promise<FeedInfo[]> {
+  return apiFetch<FeedInfo[]>("/api/feeds");
 }
 
 // --- Papers ---
@@ -240,6 +333,7 @@ export interface FetchPapersParams {
   sort_by?: string;
   order?: string;
   folder?: string;
+  feed?: string;
 }
 
 export function fetchPapers(params: FetchPapersParams = {}): Promise<PaperListResponse> {
@@ -250,6 +344,7 @@ export function fetchPapers(params: FetchPapersParams = {}): Promise<PaperListRe
   if (params.sort_by) searchParams.set("sort_by", params.sort_by);
   if (params.order) searchParams.set("order", params.order);
   if (params.folder) searchParams.set("folder", params.folder);
+  if (params.feed) searchParams.set("feed", params.feed);
 
   const qs = searchParams.toString();
   return apiFetch<PaperListResponse>(`/api/papers${qs ? `?${qs}` : ""}`);
@@ -280,6 +375,13 @@ export function markDislike(paperId: string) {
 
 export function unmarkDislike(paperId: string) {
   return apiDelete<{ success: boolean }>(`/api/papers/${paperId}/dislike`);
+}
+
+export function bulkDislike(paperIds: string[]) {
+  return apiPost<{ success: boolean; affected_count: number }>(
+    "/api/papers/bulk-dislike",
+    { paper_ids: paperIds },
+  );
 }
 
 // --- Collections ---
