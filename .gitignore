@@ -213,3 +213,4 @@ cache/
 logs/
 *.pid
 *.sock
+AGENTS.md
