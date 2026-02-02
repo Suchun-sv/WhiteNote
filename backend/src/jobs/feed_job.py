@@ -41,7 +41,11 @@ def run_feed_job(feed_id: str) -> int:
 
     # Instantiate crawler with feed-specific params
     crawler_cls = CRAWLER_REGISTRY[crawler_type]
-    crawler = crawler_cls(feed_config.params)
+    params = dict(feed_config.params or {})
+    if crawler_type == "dblp" and Config.semantic_scholar.enabled:
+        params.setdefault("s2_api_key", Config.semantic_scholar.api_key)
+        params.setdefault("s2_min_interval", Config.semantic_scholar.min_interval)
+    crawler = crawler_cls(params)
 
     logger.info(f"Running crawler '{crawler_type}' for feed '{feed_id}'...")
 
@@ -59,4 +63,18 @@ def run_feed_job(feed_id: str) -> int:
     logger.info(
         f"Feed '{feed_id}': fetched={len(papers)} inserted={len(inserted)}"
     )
+
+    # Auto-enqueue enrichment (title/abstract translation)
+    if inserted and (Config.auto_ai_title or Config.auto_ai_abstract):
+        from src.queue.tasks import enqueue_enrich_job
+
+        enqueued = 0
+        for paper in inserted:
+            try:
+                enqueue_enrich_job(paper.id)
+                enqueued += 1
+            except Exception as e:
+                logger.warning(f"Failed to enqueue enrich for {paper.id}: {e}")
+        logger.info(f"Feed '{feed_id}': enqueued {enqueued} enrich jobs")
+
     return len(inserted)
