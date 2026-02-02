@@ -10,16 +10,27 @@ from api.routes.papers import router as papers_router
 from api.routes.collections import router as collections_router
 from api.routes.chat import router as chat_router
 from api.routes.feeds import router as feeds_router
+from api.routes.tasks import router as tasks_router
+from src.config import Config
 from src.database.db.models import Base
 from src.database.db.session import engine
 from src.service.storage_service import get_storage
+from src.scheduler.scheduler_service import SchedulerService
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create any missing tables (e.g. folders) on startup
     Base.metadata.create_all(bind=engine)
+    # Start scheduler when enabled (for cron + task API)
+    scheduler = None
+    if Config.scheduler.enabled:
+        scheduler = SchedulerService()
+        scheduler.start()
+    app.state.scheduler = scheduler
     yield
+    if scheduler:
+        scheduler.shutdown()
 
 
 app = FastAPI(title="WhiteNote API", lifespan=lifespan)
@@ -48,6 +59,7 @@ app.include_router(papers_router)
 app.include_router(collections_router)
 app.include_router(chat_router)
 app.include_router(feeds_router)
+app.include_router(tasks_router)
 
 
 @app.get("/api/health")

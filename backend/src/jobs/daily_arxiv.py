@@ -24,11 +24,6 @@ LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
 from src.database.paper_repository import PaperRepository
-from src.service.llm_service import (
-    init_litellm,
-    translate_summary,
-    translate_title,
-)
 from src.config import Config
 from src.service.semantic_scholar_service import SemanticScholarClient
 from src.jobs.feed_job import run_feed_job
@@ -80,7 +75,6 @@ async def _run():
     logger.info("Daily ArXiv Job started")
 
     # --- Init ---
-    init_litellm()
     repo = PaperRepository()
 
     # --- Fetch papers via feed_job ---
@@ -95,42 +89,8 @@ async def _run():
             except Exception as e:
                 logger.error(f"Feed '{feed_config.id}' failed: {e}")
 
-    # ---------- AI title ----------
-    if Config.auto_ai_title:
-        logger.info("Generating AI titles...")
-
-        papers = repo.list_missing_ai_title(limit=-1)
-        logger.info(f"Total papers to process for AI title: {len(papers)}")
-
-        for paper in tqdm(papers, desc="Generating AI titles"):
-            try:
-                translated = translate_title(paper.title)
-                logger.info(f"AI title translated: {translated}")
-                repo.update_ai_title(
-                    paper_id=paper.id,
-                    ai_title=translated,
-                    provider=Config.chat_litellm.model,
-                )
-            except Exception as e:
-                logger.error(f"AI title failed: {paper.id} ({e})")
-
-    # ---------- AI abstract ----------
-    if Config.auto_ai_abstract:
-        logger.info("Generating AI abstracts...")
-
-        papers = repo.list_missing_ai_abstract(limit=-1)
-        logger.info(f"Total papers to process for AI abstract: {len(papers)}")
-
-        for paper in tqdm(papers, desc="Generating AI abstracts"):
-            try:
-                translated = translate_summary(paper.abstract)
-                repo.update_ai_abstract(
-                    paper_id=paper.id,
-                    ai_abstract=translated,
-                    provider=Config.chat_litellm.model,
-                )
-            except Exception as e:
-                logger.error(f"AI abstract failed: {paper.id} ({e})")
+    # NOTE: AI title/abstract translation is now handled by the enrich RQ queue.
+    # Papers are auto-enqueued for enrichment when inserted via feed_job.py.
 
     # ---------- Affiliations (Semantic Scholar) ----------
     if Config.semantic_scholar.enabled:

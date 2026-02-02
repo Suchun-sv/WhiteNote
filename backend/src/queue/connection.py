@@ -13,6 +13,7 @@ from src.config import Config
 
 # 队列名称常量
 QUEUE_SUMMARY = "summary"
+QUEUE_ENRICH = "enrich"
 QUEUE_COMIC = "comic"
 QUEUE_DEFAULT = "default"
 
@@ -58,6 +59,11 @@ def get_summary_queue() -> Queue:
 def get_comic_queue() -> Queue:
     """获取 comic 队列"""
     return get_queue(QUEUE_COMIC)
+
+
+def get_enrich_queue() -> Queue:
+    """获取 enrich 队列"""
+    return get_queue(QUEUE_ENRICH)
 
 
 def get_default_queue() -> Queue:

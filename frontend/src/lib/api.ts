@@ -324,6 +324,89 @@ export function fetchFeeds(): Promise<FeedInfo[]> {
   return apiFetch<FeedInfo[]>("/api/feeds");
 }
 
+/** Distinct feeds from papers table (for tabs). */
+export function fetchFeedsFromDb(): Promise<FeedInfo[]> {
+  return apiFetch<FeedInfo[]>("/api/feeds/from-db");
+}
+
+// --- Tasks ---
+
+export interface ScheduledJob {
+  id: string;
+  next_run_time: string | null;
+  trigger: string | null;
+}
+
+export interface QueueStats {
+  queued: number;
+  started: number;
+  finished: number;
+  failed: number;
+}
+
+export interface TasksOverview {
+  scheduled: ScheduledJob[];
+  summary_queue: QueueStats;
+  comic_queue: QueueStats;
+  enrich_queue: QueueStats;
+  pending_summary_count: number;
+  pending_comic_count: number;
+  pending_enrich_count: number;
+}
+
+export interface JobRunEntry {
+  job_type: string;
+  job_id: string;
+  started_at: string | null;
+  ended_at: string | null;
+  status: string;
+  result?: unknown;
+  error?: string | null;
+}
+
+export function fetchTasksOverview(): Promise<TasksOverview> {
+  return apiFetch<TasksOverview>("/api/tasks/overview");
+}
+
+export function fetchScheduledTasks(): Promise<ScheduledJob[]> {
+  return apiFetch<ScheduledJob[]>("/api/tasks/scheduled");
+}
+
+export function fetchPendingSummary(): Promise<Array<{ job_id: string; paper_id: string | null; enqueued_at: string | null; started_at?: string | null; status: string }>> {
+  return apiFetch("/api/tasks/pending/summary");
+}
+
+export function fetchPendingComic(): Promise<Array<{ job_id: string; paper_id: string | null; enqueued_at: string | null; started_at?: string | null; status: string }>> {
+  return apiFetch("/api/tasks/pending/comic");
+}
+
+export function fetchPendingEnrich(): Promise<Array<{ job_id: string; paper_id: string | null; enqueued_at: string | null; started_at?: string | null; status: string }>> {
+  return apiFetch("/api/tasks/pending/enrich");
+}
+
+export function fetchTaskHistory(limit?: number): Promise<JobRunEntry[]> {
+  const q = limit != null ? `?limit=${limit}` : "";
+  return apiFetch<JobRunEntry[]>(`/api/tasks/history${q}`);
+}
+
+export function fetchTaskLogs(source: string, lines?: number): Promise<{ source: string; content: string; message?: string }> {
+  const params = new URLSearchParams({ source });
+  if (lines != null) params.set("lines", String(lines));
+  return apiFetch(`/api/tasks/logs?${params.toString()}`);
+}
+
+export function runFeedNow(feedId: string): Promise<{ job_id: string; message: string }> {
+  return apiPost<{ job_id: string; message: string }>("/api/tasks/run-feed", { feed_id: feedId });
+}
+
+export function runDailyArxivNow(): Promise<{ job_id: string; message: string }> {
+  return apiPost<{ job_id: string; message: string }>("/api/tasks/run-daily-arxiv");
+}
+
+export function runEnrichBackfill(): Promise<{ enqueued: number; total_missing: number; message: string }> {
+  return apiPost<{ enqueued: number; total_missing: number; message: string }>("/api/tasks/run-enrich-backfill");
+}
+
 // --- Papers ---
 
 export interface FetchPapersParams {

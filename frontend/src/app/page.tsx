@@ -6,61 +6,45 @@ import { Loader2, ChevronsUp, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaperCard } from "@/components/paper-card";
 import { usePapers } from "@/hooks/use-papers";
-import { useFeeds } from "@/hooks/use-feeds";
+import { useFeeds, useFeedsFromDb } from "@/hooks/use-feeds";
+import { useRunFeedNow } from "@/hooks/use-tasks";
 import { useBulkDislike } from "@/hooks/use-favorites";
 import { DevDebugPanel } from "@/components/dev-debug-panel";
 import { MasonryGrid } from "@/components/masonry-grid";
 import { AddFeedDialog } from "@/components/add-feed-dialog";
 
-const VISIBLE_FEEDS_KEY = "whitenote-visible-feeds";
+const ACTIVE_FEED_KEY = "whitenote-active-feed";
 
-function getStoredVisibleFeedIds(): string[] | null {
+function getStoredActiveFeed(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(VISIBLE_FEEDS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) && parsed.every((x) => typeof x === "string")
-      ? parsed
-      : null;
+    return localStorage.getItem(ACTIVE_FEED_KEY);
   } catch {
     return null;
   }
 }
 
 export default function Home() {
+  const { data: feedsFromDb } = useFeedsFromDb();
   const { data: feeds } = useFeeds();
-  const [visibleFeedIds, setVisibleFeedIds] = useState<string[]>(["arxiv"]);
-  const [activeFeed, setActiveFeed] = useState<string>("arxiv");
+  const [activeFeed, setActiveFeed] = useState<string>(() => getStoredActiveFeed() ?? "arxiv");
   const [addFeedOpen, setAddFeedOpen] = useState(false);
 
-  // Hydrate visible tabs from localStorage; then keep in sync with feeds
+  const tabFeeds = feedsFromDb ?? [];
+
   useEffect(() => {
-    const stored = getStoredVisibleFeedIds();
-    if (stored != null && stored.length > 0) {
-      setVisibleFeedIds(stored);
-      setActiveFeed((prev) => (stored.includes(prev) ? prev : stored[0]));
-    }
-  }, []);
-  useEffect(() => {
-    if (!feeds?.length) return;
-    const validIds = new Set(feeds.map((f) => f.id));
-    setVisibleFeedIds((prev) => {
-      const next = prev.filter((id) => validIds.has(id));
-      if (next.length === 0) return [feeds[0].id];
-      return next;
-    });
-  }, [feeds]);
+    if (tabFeeds.length === 0) return;
+    const valid = new Set(tabFeeds.map((f) => f.id));
+    setActiveFeed((prev) => (valid.has(prev) ? prev : tabFeeds[0].id));
+  }, [tabFeeds]);
+
   useEffect(() => {
     try {
-      localStorage.setItem(VISIBLE_FEEDS_KEY, JSON.stringify(visibleFeedIds));
+      localStorage.setItem(ACTIVE_FEED_KEY, activeFeed);
     } catch {
       // ignore
     }
-  }, [visibleFeedIds]);
-
-  const visibleFeeds =
-    feeds?.filter((f) => visibleFeedIds.includes(f.id)) ?? [];
+  }, [activeFeed]);
 
   const { data, isLoading, isError, error, refetch } = usePapers({
     page: 1,
@@ -68,7 +52,7 @@ export default function Home() {
     feed: activeFeed,
   });
   const bulkDislike = useBulkDislike();
-  const topRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
   const papers = data?.data ?? [];
   const total = data?.pagination?.total ?? 0;
@@ -81,31 +65,31 @@ export default function Home() {
       .filter((p) => p.favorite_folders.length === 0)
       .map((p) => p.id);
 
+    // Scroll so the first card is just below the sticky header.
+    mainRef.current?.scrollIntoView({ behavior: "instant" });
+
     if (toDislike.length > 0) {
       await bulkDislike.mutateAsync(toDislike);
     } else {
       await refetch();
     }
-
-    topRef.current?.scrollIntoView({ behavior: "smooth" });
   }
 
   function handleFeedChange(feedId: string) {
     setActiveFeed(feedId);
   }
 
+  const runFeedNow = useRunFeedNow();
   function handleAddFeed(feedId: string) {
-    if (!visibleFeedIds.includes(feedId)) {
-      setVisibleFeedIds((prev) => [...prev, feedId]);
-      setActiveFeed(feedId);
-    }
+    setActiveFeed(feedId);
     setAddFeedOpen(false);
+    if (!tabFeeds.some((f) => f.id === feedId)) {
+      runFeedNow.mutate(feedId);
+    }
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div ref={topRef} />
-
       {/* Sticky header */}
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-6xl px-4 py-4">
@@ -114,7 +98,7 @@ export default function Home() {
             像刷小红书一样刷论文
           </p>
           <nav className="mt-2 flex items-center gap-1 overflow-x-auto min-w-0">
-              {visibleFeeds.map((feed) => (
+              {tabFeeds.map((feed) => (
                 <button
                   key={feed.id}
                   onClick={() => handleFeedChange(feed.id)}
@@ -140,14 +124,14 @@ export default function Home() {
                 open={addFeedOpen}
                 onOpenChange={setAddFeedOpen}
                 feeds={feeds ?? []}
-                visibleFeedIds={visibleFeedIds}
+                visibleFeedIds={tabFeeds.map((f) => f.id)}
                 onAdd={handleAddFeed}
               />
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main ref={mainRef} className="mx-auto max-w-6xl px-4 py-6 scroll-mt-[1px]">
         {isLoading && (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

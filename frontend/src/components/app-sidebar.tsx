@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Loader2, FolderOpen, BookOpen, X } from "lucide-react";
+import { Loader2, FolderOpen, BookOpen, X, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCollections } from "@/hooks/use-collections";
+import { useTasksOverview } from "@/hooks/use-tasks";
 import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
@@ -18,13 +19,20 @@ export function AppSidebar({ onClose }: AppSidebarProps) {
 
   const isHome = pathname === "/";
   const isCollectionsRoot = pathname === "/collections";
+  const isTasks = pathname === "/tasks";
   const isInFolder = pathname.startsWith("/collections/") && pathname !== "/collections";
   const currentFolder = isInFolder
     ? decodeURIComponent(pathname.replace("/collections/", ""))
     : null;
 
+  const { data: tasksOverview } = useTasksOverview();
+  const pendingTasks =
+    (tasksOverview?.pending_summary_count ?? 0) +
+    (tasksOverview?.pending_comic_count ?? 0);
+  const scheduledCount = tasksOverview?.scheduled?.length ?? 0;
+
   return (
-    <aside className="flex h-full w-full flex-col border-r bg-background pt-[env(safe-area-inset-top)]">
+    <aside className="flex h-full w-full flex-col border-l bg-background pt-[env(safe-area-inset-top)]">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <Link href="/" className="text-lg font-bold tracking-tight text-foreground hover:opacity-80" onClick={onClose}>
           WhiteNote
@@ -53,6 +61,24 @@ export function AppSidebar({ onClose }: AppSidebarProps) {
         >
           <BookOpen className="h-4 w-4 shrink-0" />
           论文
+        </Link>
+
+        <Link
+          href="/tasks"
+          className={cn(
+            "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            isTasks
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <ListTodo className="h-4 w-4 shrink-0" />
+          任务
+          {(scheduledCount > 0 || pendingTasks > 0) && (
+            <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-xs tabular-nums text-muted-foreground">
+              {scheduledCount} 定时 · {pendingTasks} 待处理
+            </span>
+          )}
         </Link>
 
         <div className="mt-2">

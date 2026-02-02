@@ -826,3 +826,17 @@ class PaperRepository:
                 )
 
             return query.count()
+
+    def get_distinct_feed_ids(self) -> List[str]:
+        """
+        Return distinct feed values from papers table (for tab list).
+        Ordered by feed id.
+        """
+        with SessionLocal() as db:
+            rows = (
+                db.query(PaperRow.feed)
+                .distinct()
+                .order_by(PaperRow.feed)
+                .all()
+            )
+            return [r[0] for r in rows if r and r[0]]

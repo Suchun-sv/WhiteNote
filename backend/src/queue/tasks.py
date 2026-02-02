@@ -11,7 +11,7 @@ from typing import Optional, List, Dict, Any
 from rq.job import Job, JobStatus
 from rq.registry import FinishedJobRegistry, FailedJobRegistry, StartedJobRegistry
 
-from .connection import get_redis_connection, get_summary_queue, get_comic_queue
+from .connection import get_redis_connection, get_summary_queue, get_comic_queue, get_enrich_queue
 
 
 def enqueue_summary_job(paper_id: str) -> str:
@@ -445,5 +445,110 @@ def get_comic_queue_size() -> int:
     获取 comic 队列中等待的任务数
     """
     queue = get_comic_queue()
+    return len(queue)
+
+
+# ========================================
+# Enrich Queue Functions
+# ========================================
+
+def enqueue_enrich_job(paper_id: str) -> str:
+    """
+    提交论文翻译（enrichment）任务到队列
+
+    Args:
+        paper_id: 论文 ID
+
+    Returns:
+        job_id: RQ 任务 ID
+    """
+    from src.jobs.paper_enrich_job import run_paper_enrich_job
+
+    queue = get_enrich_queue()
+
+    job = queue.enqueue(
+        run_paper_enrich_job,
+        paper_id,
+        job_timeout='1h',
+        result_ttl=86400,
+        failure_ttl=86400 * 7,
+    )
+
+    return job.id
+
+
+def get_enrich_queue_stats() -> Dict[str, Any]:
+    """
+    获取 enrich 队列的详细统计信息
+    """
+    queue = get_enrich_queue()
+    conn = get_redis_connection()
+
+    finished_registry = FinishedJobRegistry(queue=queue)
+    failed_registry = FailedJobRegistry(queue=queue)
+    started_registry = StartedJobRegistry(queue=queue)
+
+    queued_count = len(queue)
+    started_count = len(started_registry)
+    finished_count = len(finished_registry)
+    failed_count = len(failed_registry)
+
+    return {
+        "queued": queued_count,
+        "started": started_count,
+        "finished": finished_count,
+        "failed": failed_count,
+        "total": queued_count + started_count + finished_count + failed_count,
+    }
+
+
+def get_enrich_pending_jobs() -> List[Dict[str, Any]]:
+    """
+    获取 enrich 队列中所有等待的任务
+    """
+    queue = get_enrich_queue()
+
+    jobs = []
+    for job in queue.jobs:
+        jobs.append({
+            "job_id": job.id,
+            "paper_id": job.args[0] if job.args else None,
+            "enqueued_at": job.enqueued_at,
+            "status": job.get_status(),
+        })
+
+    return jobs
+
+
+def get_enrich_started_jobs() -> List[Dict[str, Any]]:
+    """
+    获取 enrich 队列正在执行的任务
+    """
+    queue = get_enrich_queue()
+    conn = get_redis_connection()
+    started_registry = StartedJobRegistry(queue=queue)
+
+    jobs = []
+    for job_id in started_registry.get_job_ids():
+        try:
+            job = Job.fetch(job_id, connection=conn)
+            jobs.append({
+                "job_id": job.id,
+                "paper_id": job.args[0] if job.args else None,
+                "enqueued_at": job.enqueued_at,
+                "started_at": job.started_at,
+                "status": "started",
+            })
+        except Exception:
+            continue
+
+    return jobs
+
+
+def get_enrich_queue_size() -> int:
+    """
+    获取 enrich 队列中等待的任务数
+    """
+    queue = get_enrich_queue()
     return len(queue)
 
