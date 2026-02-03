@@ -318,6 +318,7 @@ export interface FeedInfo {
   name: string;
   crawler?: string;
   year?: number | null;
+  supports_year_filter?: boolean;
 }
 
 export function fetchFeeds(): Promise<FeedInfo[]> {

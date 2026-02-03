@@ -77,6 +77,12 @@ export function useRunFeedNow() {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["feeds", "from-db"] });
     },
+    onError: (error: Error, feedId: string) => {
+      // Log error for debugging
+      console.error(`Failed to run feed ${feedId}:`, error);
+      // Re-throw so component can handle it (e.g., show toast)
+      throw error;
+    },
   });
 }
 

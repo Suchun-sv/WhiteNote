@@ -16,11 +16,37 @@ import type { FeedInfo } from "@/lib/api";
 const CRAWLER_SOURCE_HINT =
   "Not listed? Add your own crawler in backend/src/crawler/.";
 
-/** Group feeds by conference name (e.g. arXiv, ICLR). Feeds with year become "Conference" + year options. */
+/** 
+ * Extract conference name from feed id (e.g., "cvpr-2025" -> "CVPR", "arxiv" -> "arXiv").
+ * This is more reliable than parsing the display name.
+ * 
+ * Special cases:
+ * - NeurIPS: Only first letter capitalized (Neurips)
+ * - Others: All uppercase (CVPR, ICCV, ICML, ICLR, VLDB, SIGMOD, etc.)
+ */
+function getConferenceKey(feed: FeedInfo): string {
+  // Remove trailing year suffix like "-2025", "-2024" from id
+  const idWithoutYear = feed.id.replace(/-\d{4}$/, "").toLowerCase();
+  
+  // Special case mappings
+  const specialCases: Record<string, string> = {
+    "neurips": "Neurips",  // Only first letter capitalized
+    "nips": "Neurips",     // Legacy name
+  };
+  
+  if (specialCases[idWithoutYear]) {
+    return specialCases[idWithoutYear];
+  }
+  
+  // Default: all uppercase (CVPR, ICCV, ICML, ICLR, VLDB, SIGMOD, ECCV, etc.)
+  return idWithoutYear.toUpperCase();
+}
+
+/** Group feeds by conference name (e.g. arXiv, ICLR). */
 function groupFeedsByConference(feeds: FeedInfo[]): Map<string, FeedInfo[]> {
   const map = new Map<string, FeedInfo[]>();
   for (const f of feeds) {
-    const key = f.year != null ? f.name.replace(String(f.year), "").trim() : f.name;
+    const key = getConferenceKey(f);
     const list = map.get(key) ?? [];
     list.push(f);
     map.set(key, list);
@@ -67,7 +93,8 @@ export function AddFeedDialog({
 
   const selectedConference = (conference || availableConferences[0]) ?? "";
   const feedsForConference = availableByConference.get(selectedConference) ?? [];
-  const hasYears = feedsForConference.some((f) => f.year != null);
+  // Only show year selector if the crawler supports year filtering (e.g., DBLP)
+  const hasYears = feedsForConference.some((f) => f.supports_year_filter);
   const years = useMemo(
     () =>
       [...new Set(feedsForConference.map((f) => f.year).filter((y): y is number => y != null))].sort(

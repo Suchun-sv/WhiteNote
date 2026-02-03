@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, ChevronsUp, Plus } from "lucide-react";
+import { Loader2, ChevronsUp, Plus, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaperCard } from "@/components/paper-card";
 import { usePapers } from "@/hooks/use-papers";
@@ -14,6 +14,7 @@ import { MasonryGrid } from "@/components/masonry-grid";
 import { AddFeedDialog } from "@/components/add-feed-dialog";
 
 const ACTIVE_FEED_KEY = "whitenote-active-feed";
+const VISIBLE_FEEDS_KEY = "whitenote-visible-feeds";
 
 function getStoredActiveFeed(): string | null {
   if (typeof window === "undefined") return null;
@@ -24,13 +25,82 @@ function getStoredActiveFeed(): string | null {
   }
 }
 
+function getStoredVisibleFeeds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(VISIBLE_FEEDS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setStoredVisibleFeeds(feedIds: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(VISIBLE_FEEDS_KEY, JSON.stringify(feedIds));
+  } catch {
+    // ignore
+  }
+}
+
 export default function Home() {
   const { data: feedsFromDb } = useFeedsFromDb();
   const { data: feeds } = useFeeds();
-  const [activeFeed, setActiveFeed] = useState<string>(() => getStoredActiveFeed() ?? "arxiv");
+  const [activeFeed, setActiveFeed] = useState<string>("arxiv");
+  const [visibleFeedIds, setVisibleFeedIds] = useState<string[]>([]);
   const [addFeedOpen, setAddFeedOpen] = useState(false);
+  const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
 
-  const tabFeeds = feedsFromDb ?? [];
+  // Load stored preferences after mount to avoid SSR hydration mismatch
+  useEffect(() => {
+    const storedActive = getStoredActiveFeed();
+    const storedVisible = getStoredVisibleFeeds();
+    if (storedActive) {
+      setActiveFeed(storedActive);
+    }
+    if (storedVisible.length > 0) {
+      setVisibleFeedIds(storedVisible);
+    }
+    setHasLoadedStorage(true);
+  }, []);
+
+  // Initialize visible feeds from DB if not set (only run once when feedsFromDb loads)
+  useEffect(() => {
+    if (
+      hasLoadedStorage &&
+      visibleFeedIds.length === 0 &&
+      feedsFromDb &&
+      feedsFromDb.length > 0
+    ) {
+      const dbFeedIds = feedsFromDb.map((f) => f.id);
+      setVisibleFeedIds(dbFeedIds);
+      setStoredVisibleFeeds(dbFeedIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedsFromDb, hasLoadedStorage]);
+
+  // Persist visible feeds to localStorage
+  useEffect(() => {
+    if (!hasLoadedStorage) return;
+    setStoredVisibleFeeds(visibleFeedIds);
+  }, [visibleFeedIds, hasLoadedStorage]);
+
+  // Build tab feeds from visibleFeedIds, using all feeds config for metadata
+  const allFeeds = feeds ?? [];
+  const tabFeeds = useMemo(() => {
+    return visibleFeedIds
+      .map((id) => {
+        // Prefer config feed for name, fallback to DB feed
+        const configFeed = allFeeds.find((f) => f.id === id);
+        const dbFeed = feedsFromDb?.find((f) => f.id === id);
+        return {
+          id,
+          name: configFeed?.name ?? dbFeed?.name ?? id,
+        };
+      })
+      .filter((f) => f !== null);
+  }, [visibleFeedIds, allFeeds, feedsFromDb]);
 
   useEffect(() => {
     if (tabFeeds.length === 0) return;
@@ -79,13 +149,37 @@ export default function Home() {
     setActiveFeed(feedId);
   }
 
+  function handleRemoveFeed(feedId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    setVisibleFeedIds((prev) => prev.filter((id) => id !== feedId));
+    // If removing active feed, switch to another one
+    if (activeFeed === feedId) {
+      const remaining = visibleFeedIds.filter((id) => id !== feedId);
+      if (remaining.length > 0) {
+        setActiveFeed(remaining[0]);
+      }
+    }
+  }
+
   const runFeedNow = useRunFeedNow();
+  const [feedError, setFeedError] = useState<string | null>(null);
+  
   function handleAddFeed(feedId: string) {
+    // Add to visible feeds if not already there
+    if (!visibleFeedIds.includes(feedId)) {
+      setVisibleFeedIds((prev) => [...prev, feedId]);
+    }
     setActiveFeed(feedId);
     setAddFeedOpen(false);
-    if (!tabFeeds.some((f) => f.id === feedId)) {
-      runFeedNow.mutate(feedId);
-    }
+    setFeedError(null);
+    
+    // Always trigger crawl for the feed
+    runFeedNow.mutate(feedId, {
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setFeedError(`Failed to fetch papers for ${feedId}: ${message}`);
+      },
+    });
   }
 
   return (
@@ -97,19 +191,56 @@ export default function Home() {
           <p className="text-sm text-muted-foreground">
             像刷小红书一样刷论文
           </p>
+          
+          {/* Feed Error Alert */}
+          {feedError && (
+            <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-700">{feedError}</p>
+                <p className="text-xs text-red-500 mt-1">
+                  如果错误持续，请检查后端服务或稍后重试。
+                </p>
+              </div>
+              <button 
+                onClick={() => setFeedError(null)}
+                className="text-red-400 hover:text-red-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          
+          {/* Crawl Status Indicator */}
+          {runFeedNow.isPending && (
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md flex items-center gap-2">
+              <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+              <span className="text-sm text-blue-700">
+                正在抓取论文，请稍候... (首次抓取可能需要几分钟)
+              </span>
+            </div>
+          )}
+          
           <nav className="mt-2 flex items-center gap-1 overflow-x-auto min-w-0">
               {tabFeeds.map((feed) => (
-                <button
+                <div
                   key={feed.id}
-                  onClick={() => handleFeedChange(feed.id)}
-                  className={`text-sm font-medium pb-0.5 whitespace-nowrap shrink-0 ${
+                  className={`group flex items-center gap-0.5 pb-0.5 whitespace-nowrap shrink-0 cursor-pointer ${
                     activeFeed === feed.id
                       ? "text-foreground border-b-2 border-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
+                  onClick={() => handleFeedChange(feed.id)}
                 >
-                  {feed.name}
-                </button>
+                  <span className="text-sm font-medium">{feed.name}</span>
+                  <button
+                    onClick={(e) => handleRemoveFeed(feed.id, e)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-muted rounded"
+                    title="Remove tab"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               ))}
               <Button
                 variant="ghost"
@@ -150,7 +281,14 @@ export default function Home() {
 
         {!isLoading && !isError && papers.length === 0 && (
           <div className="py-20 text-center text-muted-foreground">
-            暂无论文，等待新论文入库
+            {runFeedNow.isPending ? (
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span>正在抓取论文...</span>
+              </div>
+            ) : (
+              "暂无论文，等待新论文入库"
+            )}
           </div>
         )}
 

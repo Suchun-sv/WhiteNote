@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/feeds", tags=["feeds"])
 
 
 def _year_from_feed(f: FeedConfig) -> Optional[int]:
-    """Extract year from feed id (e.g. iclr-2026) or openreview venue param."""
+    """Extract year from feed id (e.g. iclr-2026), openreview venue param, or params.year."""
     # Try id pattern like "iclr-2026", "neurips-2025"
     m = re.search(r"-(\d{4})$", f.id)
     if m:
@@ -22,6 +22,13 @@ def _year_from_feed(f: FeedConfig) -> Optional[int]:
     m = re.search(r"/(\d{4})/", venue)
     if m:
         return int(m.group(1))
+    # DBLP crawler params.year (e.g. "2025")
+    year_param = (f.params or {}).get("year")
+    if year_param:
+        try:
+            return int(year_param)
+        except (ValueError, TypeError):
+            pass
     return None
 
 
@@ -30,6 +37,17 @@ class FeedInfo(BaseModel):
     name: str
     crawler: str = "arxiv"
     year: Optional[int] = None
+    supports_year_filter: bool = False
+
+
+def _supports_year_filter(f: FeedConfig) -> bool:
+    """Check if the crawler for this feed supports year-based filtering.
+    
+    - arxiv: No year filtering support (searches by keyword only)
+    - dblp (Semantic Scholar bulk): Supports year filtering via params.year
+    - openreview: No year filtering (venue determines year)
+    """
+    return f.crawler == "dblp"
 
 
 @router.get("", response_model=List[FeedInfo])
@@ -41,6 +59,7 @@ def list_feeds():
             name=f.name,
             crawler=f.crawler,
             year=_year_from_feed(f),
+            supports_year_filter=_supports_year_filter(f),
         )
         for f in Config.feeds
     ]
@@ -60,10 +79,18 @@ def list_feeds_from_db(repo: PaperRepository = Depends(get_paper_repo)):
     feed_ids = repo.get_distinct_feed_ids()
     if not feed_ids and Config.feeds:
         feed_ids = [Config.feeds[0].id]
-    return [
-        FeedInfo(
+    
+    # Build lookup from config
+    config_feeds_by_id = {f.id: f for f in Config.feeds}
+    
+    result = []
+    for fid in feed_ids:
+        config_feed = config_feeds_by_id.get(fid)
+        result.append(FeedInfo(
             id=fid,
             name=_name_for_feed_id(fid),
-        )
-        for fid in feed_ids
-    ]
+            crawler=config_feed.crawler if config_feed else "unknown",
+            year=_year_from_feed(config_feed) if config_feed else None,
+            supports_year_filter=_supports_year_filter(config_feed) if config_feed else False,
+        ))
+    return result

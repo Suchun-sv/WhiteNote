@@ -31,7 +31,8 @@ class ArxivCrawler(BaseCrawler):
 
     def fetch(self) -> List[Paper]:
         keywords: List[str] = self.params.get("keywords", [])
-        max_results: int = self.params.get("max_results", 100)
+        raw_max = self.params.get("max_results")
+        max_results: int = raw_max if raw_max is not None else 1000  # 默认 1000，设为 null 也不无限（arxiv API 有硬限制）
 
         all_papers: List[Paper] = []
         seen_ids: set[str] = set()

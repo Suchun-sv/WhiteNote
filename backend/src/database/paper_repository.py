@@ -840,3 +840,20 @@ class PaperRepository:
                 .all()
             )
             return [r[0] for r in rows if r and r[0]]
+
+    def delete_by_feed(self, feed_id: str) -> int:
+        """
+        Delete all papers from a specific feed.
+        
+        Args:
+            feed_id: The feed ID to delete papers from
+            
+        Returns:
+            Number of papers deleted
+        """
+        from sqlalchemy import delete
+        with SessionLocal() as db:
+            stmt = delete(PaperRow).where(PaperRow.feed == feed_id)
+            result = db.execute(stmt)
+            db.commit()
+            return result.rowcount

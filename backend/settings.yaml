@@ -56,80 +56,65 @@ feeds:
     crawler: dblp
     schedule: null
     params:
-      query: "conf/cvpr/2025"
+      venue: "CVPR"
       year: "2025"
-      venue_contains: "CVPR"
-      limit: 200
-      per_page: 100
+      limit: null
       min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      batch_size: 500
+      include_workshops: false
   - id: iccv-2025
     name: ICCV 2025
     crawler: dblp
     schedule: null
     params:
-      query: "conf/iccv/2025"
+      venue: "ICCV"
       year: "2025"
-      venue_contains: "ICCV"
-      limit: 200
-      per_page: 100
+      limit: null
       min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      batch_size: 500
+      include_workshops: false
   - id: icml-2025
     name: ICML 2025
     crawler: dblp
     schedule: null
     params:
-      query: "conf/icml/2025"
+      venue: "ICML"
       year: "2025"
-      venue_contains: "ICML"
-      limit: 200
-      per_page: 100
+      limit: null
       min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      batch_size: 500
+      include_workshops: false
   - id: iclr-2025
     name: ICLR 2025
     crawler: dblp
     schedule: null
     params:
-      query: "conf/iclr/2025"
+      venue: "ICLR"
       year: "2025"
-      venue_contains: "ICLR"
-      limit: 200
-      per_page: 100
+      limit: null
       min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      batch_size: 500
+      include_workshops: false
   - id: neurips-2025
     name: NeurIPS 2025
     crawler: dblp
     schedule: null
     params:
-      query: "conf/nips/2025"
+      venue: "NeurIPS"
       year: "2025"
-      venue_contains: "NeurIPS"
-      limit: 200
-      per_page: 100
+      limit: null
       min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      batch_size: 500
+      include_workshops: false
   - id: vldb-2025
     name: VLDB 2025
     crawler: dblp
     schedule: null
     params:
-      query: "conf/vldb/2025"
+      venue: "VLDB"
       year: "2025"
-      venue_contains: "VLDB"
-      type_includes: "journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: sigmod-2025
     name: SIGMOD 2025
     crawler: dblp
@@ -137,13 +122,8 @@ feeds:
     params:
       query: "conf/sigmod/2025"
       year: "2025"
-      venue_contains: "SIGMOD"
-      type_includes: "conference and workshop papers,journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: cvpr-2023
     name: CVPR 2023
     crawler: dblp
@@ -151,12 +131,8 @@ feeds:
     params:
       query: "conf/cvpr/2023"
       year: "2023"
-      venue_contains: "CVPR"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: cvpr-2024
     name: CVPR 2024
     crawler: dblp
@@ -164,12 +140,8 @@ feeds:
     params:
       query: "conf/cvpr/2024"
       year: "2024"
-      venue_contains: "CVPR"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: cvpr-2026
     name: CVPR 2026
     crawler: dblp
@@ -177,12 +149,8 @@ feeds:
     params:
       query: "conf/cvpr/2026"
       year: "2026"
-      venue_contains: "CVPR"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: iccv-2023
     name: ICCV 2023
     crawler: dblp
@@ -190,12 +158,8 @@ feeds:
     params:
       query: "conf/iccv/2023"
       year: "2023"
-      venue_contains: "ICCV"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: iccv-2024
     name: ICCV 2024
     crawler: dblp
@@ -203,12 +167,8 @@ feeds:
     params:
       query: "conf/iccv/2024"
       year: "2024"
-      venue_contains: "ICCV"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: iccv-2026
     name: ICCV 2026
     crawler: dblp
@@ -216,38 +176,26 @@ feeds:
     params:
       query: "conf/iccv/2026"
       year: "2026"
-      venue_contains: "ICCV"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: eccv-2024
     name: ECCV 2024
     crawler: dblp
     schedule: null
     params:
-      query: "conf/eccv/2024"
+      venue: "ECCV"
       year: "2024"
-      venue_contains: "ECCV"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: eccv-2025
     name: ECCV 2025
     crawler: dblp
     schedule: null
     params:
-      query: "conf/eccv/2025"
+      venue: "ECCV"
       year: "2025"
-      venue_contains: "ECCV"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: icml-2023
     name: ICML 2023
     crawler: dblp
@@ -255,12 +203,8 @@ feeds:
     params:
       query: "conf/icml/2023"
       year: "2023"
-      venue_contains: "ICML"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: icml-2024
     name: ICML 2024
     crawler: dblp
@@ -268,12 +212,8 @@ feeds:
     params:
       query: "conf/icml/2024"
       year: "2024"
-      venue_contains: "ICML"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: icml-2026
     name: ICML 2026
     crawler: dblp
@@ -281,12 +221,8 @@ feeds:
     params:
       query: "conf/icml/2026"
       year: "2026"
-      venue_contains: "ICML"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: iclr-2023
     name: ICLR 2023
     crawler: dblp
@@ -294,12 +230,8 @@ feeds:
     params:
       query: "conf/iclr/2023"
       year: "2023"
-      venue_contains: "ICLR"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: iclr-2024
     name: ICLR 2024
     crawler: dblp
@@ -307,12 +239,8 @@ feeds:
     params:
       query: "conf/iclr/2024"
       year: "2024"
-      venue_contains: "ICLR"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: neurips-2023
     name: NeurIPS 2023
     crawler: dblp
@@ -320,12 +248,8 @@ feeds:
     params:
       query: "conf/nips/2023"
       year: "2023"
-      venue_contains: "NeurIPS"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: neurips-2024
     name: NeurIPS 2024
     crawler: dblp
@@ -333,12 +257,8 @@ feeds:
     params:
       query: "conf/nips/2024"
       year: "2024"
-      venue_contains: "NeurIPS"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: neurips-2026
     name: NeurIPS 2026
     crawler: dblp
@@ -346,12 +266,8 @@ feeds:
     params:
       query: "conf/nips/2026"
       year: "2026"
-      venue_contains: "NeurIPS"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: sigmod-2023
     name: SIGMOD 2023
     crawler: dblp
@@ -359,13 +275,8 @@ feeds:
     params:
       query: "conf/sigmod/2023"
       year: "2023"
-      venue_contains: "SIGMOD"
-      type_includes: "conference and workshop papers,journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: sigmod-2024
     name: SIGMOD 2024
     crawler: dblp
@@ -373,13 +284,8 @@ feeds:
     params:
       query: "conf/sigmod/2024"
       year: "2024"
-      venue_contains: "SIGMOD"
-      type_includes: "conference and workshop papers,journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: sigmod-2026
     name: SIGMOD 2026
     crawler: dblp
@@ -387,13 +293,8 @@ feeds:
     params:
       query: "conf/sigmod/2026"
       year: "2026"
-      venue_contains: "SIGMOD"
-      type_includes: "conference and workshop papers,journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: vldb-2023
     name: VLDB 2023
     crawler: dblp
@@ -401,13 +302,8 @@ feeds:
     params:
       query: "conf/vldb/2023"
       year: "2023"
-      venue_contains: "VLDB"
-      type_includes: "journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
   - id: vldb-2024
     name: VLDB 2024
     crawler: dblp
@@ -415,13 +311,8 @@ feeds:
     params:
       query: "conf/vldb/2024"
       year: "2024"
-      venue_contains: "VLDB"
-      type_includes: "journal articles"
-      limit: 200
-      per_page: 100
-      min_interval: 1.0
-      max_pages: null
-      enrich_abstracts: true
+      limit: null
+      min_interval: 3.0
 
 paper_save_path: "cache/papers.json"
 
