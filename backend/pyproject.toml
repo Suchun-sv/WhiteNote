@@ -24,4 +24,12 @@ dependencies = [
     "rq>=2.0.0",
     "supervisor>=4.2.0",
     "google-genai>=1.57.0",
+    "fastmcp>=0.4.0",
+    "pyzotero>=1.5.20",
+    "python-dotenv>=1.0.0",
 ]
+
+[project.scripts]
+whitenote-mcp = "src.mcp_server.server:cli"
+whitenote-worker = "worker:main"
+whitenote-scheduler = "src.scheduler.main:main"

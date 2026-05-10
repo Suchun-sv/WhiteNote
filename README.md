@@ -41,88 +41,117 @@
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Docker Compose)
 
-### 1. 环境准备
+WhiteNote ships as a single `docker compose` stack — Postgres + Redis + Qdrant + the WhiteNote app (Streamlit UI, RQ worker, scheduler, and **MCP server**).
 
 ```bash
-# 克隆项目
 git clone https://github.com/your-repo/WhiteNote.git
 cd WhiteNote
 
-# 启动依赖服务 (PostgreSQL + Redis + Qdrant)
-docker-compose up -d
+# 1. configure
+cp .env.example .env
+$EDITOR .env                              # fill in LLM / Gemini / Zotero keys
+
+# (optional) tune non-secret settings
+cp backend/settings.example.yaml backend/settings.yaml
+
+# 2. up
+docker compose up --build
 ```
 
-### 2. 安装依赖
+What you get:
+
+| URL | Purpose |
+|-----|---------|
+| http://localhost:8501              | Streamlit UI (human) |
+| http://127.0.0.1:8765/mcp/         | MCP endpoint (streamable HTTP, for agents) |
+| http://127.0.0.1:8765/sse/         | MCP endpoint (SSE, legacy clients) |
+
+The database is initialised automatically on first run (the `db-init` service). The worker and scheduler start once the DB is ready.
+
+---
+
+## 🤖 Use as MCP server
+
+WhiteNote exposes its arXiv crawler, paper store, chat, and Zotero adapter as MCP tools so any agent (Claude Desktop, Claude Code, custom agents) can read papers, decide what's interesting, and save keepers to Zotero.
+
+### Add to Claude Desktop / Claude Code
+
+```jsonc
+{
+  "mcpServers": {
+    "whitenote": {
+      "url": "http://127.0.0.1:8765/mcp/"
+    }
+  }
+}
+```
+
+For older clients that only support SSE, use `http://127.0.0.1:8765/sse/`.
+
+### Available tools
+
+| Tool | What it does |
+|------|--------------|
+| `list_recent_papers` | Most recent papers (paginated) |
+| `search_papers` | Title-substring search in the local DB |
+| `fetch_arxiv_now` | On-demand crawl for given keywords |
+| `get_paper` | Full paper record (optionally with extracted PDF text) |
+| `get_paper_summary` | Returns cached AI summary, enqueues a job if missing |
+| `generate_comic` | Enqueue a comic-generation job |
+| `chat_with_paper` | Multi-turn Q&A grounded in the paper |
+| `mark_paper` | `liked` / `disliked` / `later` / `folder:<name>` |
+| `list_liked_papers`, `list_folders` | Read agent verdicts back |
+| `job_status`, `queue_stats` | Poll the RQ queue |
+| `list_zotero_collections` | Fetch the user's Zotero collections |
+| `save_to_zotero` | Push a paper to Zotero (optionally attach the PDF) |
+
+### Typical agent flow
+
+> *"What new papers came in today? Pick the most interesting one and save it to my Zotero 'Inbox' collection."*
+
+```
+fetch_arxiv_now(keywords=["RAG"])
+  → list_recent_papers(limit=10)
+  → get_paper(id=...)            # for the top few
+  → get_paper_summary(id=...)    # may enqueue + poll
+  → chat_with_paper(...)         # optional follow-up
+  → mark_paper(id=..., action="liked")
+  → list_zotero_collections()
+  → save_to_zotero(id=..., collection_key="...")
+```
+
+### Expose for a test session (Cloudflare quick tunnel)
 
 ```bash
-cd backend
+./scripts/tunnel.sh           # tunnel just Streamlit (safe)
+./scripts/tunnel.sh mcp       # ⚠ exposes MCP — no auth, kill when done
+./scripts/tunnel.sh both
+```
 
-# 使用 uv (推荐)
+Requires `cloudflared` on PATH (`brew install cloudflared` / apt / docker). You get a random `https://*.trycloudflare.com` URL live until you Ctrl-C — no signup needed.
+
+### Security note
+
+By default the MCP port is bound to **127.0.0.1** on the host (see `MCP_BIND` in `.env`). The server has no auth — set `MCP_BIND=0.0.0.0` only if you trust the network or put a reverse proxy with auth in front.
+
+---
+
+## 🛠️ Local development (without Docker)
+
+Still supported:
+
+```bash
+docker compose up -d postgres redis qdrant   # infra only
+cd backend
 uv sync
-
-# 或使用 pip
-pip install -e .
-```
-
-### 3. 配置
-
-编辑 `backend/settings.yaml`：
-
-```yaml
-# 语言设置
-language: "中文（简体）"
-
-# 关键词订阅
-keywords:
-  - "RAG"
-  - "agent"
-  - "vector database"
-
-# LLM 配置 (用于翻译/总结/问答)
-chat_litellm:
-  model: "gpt-4o-mini"
-  api_key: "your-openai-api-key"
-  api_base: "https://api.openai.com/v1"
-
-# Gemini 配置 (用于漫画生成)
-gemini:
-  api_key: "your-gemini-api-key"
-  model: "gemini-2.0-flash-preview-image-generation"
-```
-
-创建 `backend/.env` 文件（可选，覆盖 yaml 配置）：
-
-```bash
-GEMINI__API_KEY=your-gemini-api-key
-DATABASE_URL=postgresql://whitenote:whitenote_password@localhost:5432/whitenote
-```
-
-### 4. 初始化数据库
-
-```bash
-cd backend
 uv run python -m src.scripts.init_db
+uv run python worker.py            # terminal 1
+uv run python -m src.scheduler.main  # terminal 2
+uv run streamlit run app.py        # terminal 3
+uv run python -m src.mcp_server.server --transport http --port 8765  # terminal 4
 ```
-
-### 5. 启动服务
-
-**终端 1：启动 RQ Worker（后台任务处理）**
-
-```bash
-cd backend
-uv run supervisord -c supervisord.conf
-```
-
-**终端 2：启动 Streamlit 应用**
-
-```bash
-cd backend
-uv run streamlit run app.py
-```
-
-访问 http://localhost:8501 🎉
 
 ---
 

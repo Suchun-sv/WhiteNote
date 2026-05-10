@@ -195,6 +195,25 @@ class PaperRepository:
             return [Paper.model_validate(r.paper) for r in rows]
 
     # =====================================================
+    # Search
+    # =====================================================
+
+    def search_by_title(self, query: str, limit: int = 20) -> List[Paper]:
+        """Case-insensitive substring match on title."""
+        if not query or not query.strip():
+            return []
+        pattern = f"%{query.strip()}%"
+        with SessionLocal() as db:
+            rows = (
+                db.query(PaperRow)
+                .filter(PaperRow.title.ilike(pattern))
+                .order_by(PaperRow.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+            return [Paper.model_validate(r.paper) for r in rows]
+
+    # =====================================================
     # Enrichment helpers (daily job)
     # =====================================================
 

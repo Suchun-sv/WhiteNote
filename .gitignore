@@ -208,6 +208,7 @@ __marimo__/
 
 .vscode/
 cache/
+data/
 
 # Supervisor
 logs/
