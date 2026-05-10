@@ -8,8 +8,8 @@ x-app-base: &app-base
     REDIS__PORT: ${REDIS__PORT:-6379}
     QDRANT_DATABASE__HOST: ${QDRANT_DATABASE__HOST:-qdrant}
   volumes:
-    - cache:/app/cache
-    - logs:/app/logs
+    - ${DATA_DIR:-./data}/cache:/app/cache
+    - ${DATA_DIR:-./data}/logs:/app/logs
   depends_on:
     postgres:
       condition: service_started
@@ -31,7 +31,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
 
   qdrant:
     image: qdrant/qdrant:v1.11.0
@@ -41,7 +41,7 @@ services:
       - "6333:6333"
       - "6334:6334"
     volumes:
-      - qdrant_data:/qdrant/storage
+      - ${DATA_DIR:-./data}/qdrant:/qdrant/storage
 
   redis:
     image: redis:7-alpine
@@ -50,7 +50,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ${DATA_DIR:-./data}/redis:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -127,10 +127,3 @@ services:
         condition: service_started
       db-init:
         condition: service_completed_successfully
-
-volumes:
-  postgres_data:
-  qdrant_data:
-  redis_data:
-  cache:
-  logs:

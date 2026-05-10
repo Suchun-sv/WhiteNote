@@ -2,25 +2,25 @@ services:
   worker:
     volumes:
       - ./backend:/app
-      - cache:/app/cache
-      - logs:/app/logs
+      - ${DATA_DIR:-./data}/cache:/app/cache
+      - ${DATA_DIR:-./data}/logs:/app/logs
 
   scheduler:
     volumes:
       - ./backend:/app
-      - cache:/app/cache
-      - logs:/app/logs
+      - ${DATA_DIR:-./data}/cache:/app/cache
+      - ${DATA_DIR:-./data}/logs:/app/logs
 
   streamlit:
     volumes:
       - ./backend:/app
-      - cache:/app/cache
-      - logs:/app/logs
+      - ${DATA_DIR:-./data}/cache:/app/cache
+      - ${DATA_DIR:-./data}/logs:/app/logs
 
   mcp-server:
     volumes:
       - ./backend:/app
-      - cache:/app/cache
-      - logs:/app/logs
+      - ${DATA_DIR:-./data}/cache:/app/cache
+      - ${DATA_DIR:-./data}/logs:/app/logs
     ports:
       - "${MCP_BIND:-127.0.0.1}:8765:8765"

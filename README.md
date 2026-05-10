@@ -122,6 +122,16 @@ fetch_arxiv_now(keywords=["RAG"])
   → save_to_zotero(id=..., collection_key="...")
 ```
 
+### Expose for a test session (Cloudflare quick tunnel)
+
+```bash
+./scripts/tunnel.sh           # tunnel just Streamlit (safe)
+./scripts/tunnel.sh mcp       # ⚠ exposes MCP — no auth, kill when done
+./scripts/tunnel.sh both
+```
+
+Requires `cloudflared` on PATH (`brew install cloudflared` / apt / docker). You get a random `https://*.trycloudflare.com` URL live until you Ctrl-C — no signup needed.
+
 ### Security note
 
 By default the MCP port is bound to **127.0.0.1** on the host (see `MCP_BIND` in `.env`). The server has no auth — set `MCP_BIND=0.0.0.0` only if you trust the network or put a reverse proxy with auth in front.
