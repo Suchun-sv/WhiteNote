@@ -1,0 +1,36 @@
+# WhiteNote non-secret configuration.
+# Copy to settings.yaml. API keys live in .env, not here.
+
+language: "中文（简体）"
+
+keywords:
+  - "RAG"
+  - "agent"
+  - "vector database"
+
+auto_ai_title: true
+auto_ai_abstract: true
+
+paper_save_path: "cache/papers.json"
+pdf_save_path: "cache/pdfs/"
+image_save_path: "cache/imgs/"
+embedding_save_path: "cache/embeddings/"
+
+pdf_download:
+  max_concurrency: 8
+  timeout: 30
+  retries: 3
+
+scheduler:
+  enabled: true
+  timezone: "Asia/Shanghai"
+  daily_arxiv_job: "0 */1 * * *"
+
+favorite:
+  auto_download_pdf: true
+  auto_generate_summary: true
+  auto_generate_image: false
+
+gemini:
+  model: "gemini-3-pro-image-preview"
+  image_size: "1K"

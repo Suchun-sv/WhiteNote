@@ -61,6 +61,21 @@ class RedisConfig(BaseModel):
     password: Annotated[Optional[str], Field(default=None)]
 
 
+class ZoteroConfig(BaseModel):
+    """Zotero 集成配置（供 MCP `save_to_zotero` 使用）"""
+    api_key: Annotated[str, Field(default="")]
+    library_id: Annotated[str, Field(default="")]
+    library_type: Annotated[str, Field(default="user")]  # "user" 或 "group"
+    default_collection: Annotated[Optional[str], Field(default=None)]
+
+
+class McpConfig(BaseModel):
+    """MCP server 配置"""
+    host: Annotated[str, Field(default="0.0.0.0")]
+    port: Annotated[int, Field(default=8765)]
+    transport: Annotated[str, Field(default="http")]  # http | stdio
+
+
 class Settings(BaseSettings):
     language: Annotated[str, Field(default="en")]
     source_list: Annotated[List[str], Field(default=["arXiv"])]
@@ -85,6 +100,8 @@ class Settings(BaseSettings):
     favorite: FavoriteConfig = Field(default_factory=FavoriteConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
+    zotero: ZoteroConfig = Field(default_factory=ZoteroConfig)
+    mcp: McpConfig = Field(default_factory=McpConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",

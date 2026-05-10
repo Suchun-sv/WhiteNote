@@ -1,0 +1,26 @@
+services:
+  worker:
+    volumes:
+      - ./backend:/app
+      - cache:/app/cache
+      - logs:/app/logs
+
+  scheduler:
+    volumes:
+      - ./backend:/app
+      - cache:/app/cache
+      - logs:/app/logs
+
+  streamlit:
+    volumes:
+      - ./backend:/app
+      - cache:/app/cache
+      - logs:/app/logs
+
+  mcp-server:
+    volumes:
+      - ./backend:/app
+      - cache:/app/cache
+      - logs:/app/logs
+    ports:
+      - "${MCP_BIND:-127.0.0.1}:8765:8765"
